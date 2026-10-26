@@ -1,0 +1,11 @@
+# 运行体：由 CI 从上游镜像抽取，不入库（约 40MB）
+rootfs/
+# 打包产物
+publish/
+.stage/
+# 本地开发/取证脚本与导入数据（含设备凭据，别外传）
+import/
+build/
+*.zip
+*.tgz
+__pycache__/

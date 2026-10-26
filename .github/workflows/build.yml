@@ -1,0 +1,101 @@
+name: build
+
+# 上游一发新版 → 自动抽运行体、打包、发 Release。
+# 版本号：YY.MM.DD_x（北京时间当天第 x 个包），versionCode = YYMMDD*100+x。
+on:
+  workflow_dispatch:
+    inputs:
+      upstream:
+        description: '上游 tag（留空＝自动取最新，例如 3.3.0-beta.4）'
+        required: false
+      force:
+        description: '上游没变也强出一个新包'
+        type: boolean
+        default: false
+  schedule:
+    - cron: '30 19 * * *' # UTC 19:30 ＝ 北京 03:30
+
+permissions:
+  contents: write
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 装 qemu（为了在 amd64 runner 上跑 arm64 镜像里的小脚本）
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: 解析上游版本
+        id: up
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force && '1' || '0' }}
+        run: bash scripts/ci/upstream.sh "${{ inputs.upstream }}"
+
+      - name: 算本次版本号
+        id: ver
+        if: steps.up.outputs.skip != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          today=$(TZ=Asia/Shanghai date +%y.%m.%d)
+          used=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[].tag_name' 2>/dev/null || true)
+          n=1
+          while printf '%s\n' "$used" | grep -qx "v${today}_${n}"; do n=$((n + 1)); done
+          v="${today}_${n}"
+          echo "本次版本: v$v（versionCode $((10#${today//./} * 100 + n))）"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: 抽取运行体
+        if: steps.up.outputs.skip != '1'
+        run: bash scripts/ci/rootfs.sh "${{ steps.up.outputs.tag }}"
+
+      - name: 打包
+        if: steps.up.outputs.skip != '1'
+        run: python3 build_module.py "${{ steps.ver.outputs.version }}"
+
+      - name: 发 Release
+        if: steps.up.outputs.skip != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.ver.outputs.version }}
+          UP: ${{ steps.up.outputs.tag }}
+        run: |
+          set -euo pipefail
+          zip="publish/ag2a-magisk-v${V}.zip"
+          sha=$(sha256sum "$zip" | cut -d' ' -f1)
+          cat > notes.md <<EOF
+          模块版本 **$V**，打包的上游运行体 **$UP**（从官方镜像 \`aimodcc/agent2api\` 原样抽取）。
+
+          - 大小 $(du -h "$zip" | cut -f1)，sha256 \`$sha\`
+          - 安装：在管理器里刷入 zip（APatch / Magisk / KernelSU）
+          - 刷完服务立即生效（运行体在 \`/data/adb/ag2a/rt/\`）；两个按钮的面板入口需重启一次
+
+          上游：[aimod-cc/agent2api](https://github.com/aimod-cc/agent2api)（MIT）
+          EOF
+          gh release create "v$V" "$zip" --title "$V" --notes-file notes.md
+
+      - name: 记账（UPSTREAM）
+        if: steps.up.outputs.skip != '1'
+        env:
+          UP: ${{ steps.up.outputs.tag }}
+        run: |
+          set -euo pipefail
+          echo "$UP" > UPSTREAM
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add UPSTREAM
+          git commit -m "chore: 上游 → $UP"
+          git push
+
+      - name: 没有新版
+        if: steps.up.outputs.skip == '1'
+        run: echo "上游仍是 ${{ steps.up.outputs.tag }}，跳过。要强制出包请勾 force。"

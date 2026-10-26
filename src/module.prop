@@ -1,0 +1,6 @@
+id=ag2a
+name=Agent2API
+version=26.10.26_1 (ag2a 3.3.0-beta.4)
+versionCode=26102601
+author=huxc573
+description=在手机本地跑 Agent2API，把多家 AI 客户端的登录态变成 OpenAI 兼容网关。arm64，glibc 直跑。点「执行」＝重启网关进程，点「打开」＝进面板。
