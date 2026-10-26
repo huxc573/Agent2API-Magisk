@@ -4,7 +4,7 @@
 不 chroot、不做 Debian rootfs：二进制只依赖 glibc 的 4 个 .so，用模块自带的 loader 直跑。
 
 - 适用 APatch / Magisk / KernelSU
-- 仓库名沿用社区习惯：上游名 + `-Magisk`（同 `OpenList-Magisk`、`box_for_Magisk`）
+- 仓库名沿用社区习惯：上游名 + `-Magisk`（同 `OpenList-Magisk`、`box_for_magisk`）
 
 > **上游与致谢**：服务本体、panel UI、官方插件全部来自
 > [aimod-cc/agent2api](https://github.com/aimod-cc/agent2api)（**MIT**，镜像 `aimodcc/agent2api`）。
@@ -13,10 +13,12 @@
 
 ## 安装
 
-1. 从 [Releases](../../releases) 下载最新那个 zip（都是 pre-release，按日期取最上面一个），在管理器里刷入；
-2. 按音量键答两题（音量下＝下一项，音量上＝确认）——端口（当前值 / 3065 ↔ 52018）、自动更新（开/关，首次默认关）；
-3. 刷完**不用重启手机**：`customize.sh` 会把 `bin/`+`ui/` 同步到 `/data/adb/ag2a/rt/`，再用新脚本停旧起新；
-4. 打开 `http://127.0.0.1:3065/` 自己建管理员（密码 ≥8 位，不预设默认账号）。
+1. 从 [Releases](../../releases) 下最上面那个 zip（**全部以 pre-release 发布**，页面没有 Latest，按时间倒序取第一行），在管理器里刷入；
+2. 按音量键答两题（音量下＝下一项，音量上＝确认）——端口（3065 ↔ 52018，首项是当前值）、自动更新（开/关，首次默认关）；
+   已装过的机器会**先多问一题**「是否重新设置」，音量上直接确认＝配置一个字都不动；
+3. **首次安装要重启手机**：刷 zip 只解到 `modules_update/`，模块目录要重启才整体替换，安装器会提示「首次安装，重启设备后自动运行」。
+   只有升级安装（模块已在）才不用重启：`customize.sh` 会把 `bin/`+`ui/` 同步到 `/data/adb/ag2a/rt/`，再用新脚本停旧起新；
+4. 重启后打开 `http://127.0.0.1:<第 2 步选的端口>/`（默认 3065）自己建管理员（密码 ≥8 位，不预设默认账号）。
 
 ## 管理器里的三个按钮
 
@@ -47,7 +49,7 @@ su -c "tail -50 /data/adb/ag2a/run.log"
 卸载会清干净，但只碰 `/data/adb/modules/ag2a`、`/data/adb/modules_update/ag2a`、`/data/adb/ag2a` 三个逐字写死的路径（`uninstall.sh` 的 `safe_rm` 白名单）。
 想重装保留账号：卸载前 `touch /data/adb/ag2a/keep`。
 
-## 为什么刷完不用重启手机
+## 为什么升级不用重启手机
 
 `/data/adb/modules/ag2a` 由管理器管，刷 zip 只解到 `modules_update/`，**重启才整体替换**——运行体放那儿，
 跑着的自然还是旧二进制。所以会变的部分搬到数据目录：
@@ -99,7 +101,7 @@ su -c "sh $M/action.sh auto channel beta|stable"
 su -c "sh $M/updater.sh now"                   # 立刻查一次
 ```
 
-- ⚠ 不能用 `/releases/latest`：上游 3.2.0 之后全是 pre-release，latest 永远停在 v3.0.8，所以按 tag 列表挑。
+- ⚠ 不能用 `/releases/latest`：上游正式版最高只到 **v3.0.8**（v3.0.9 之后全是 beta），latest 永远返回它 ⇒ 只能按 tag 列表挑。
 - 资产下载走多源：`gh-proxy.com → ghproxy.net → ghfast.top → GitHub 直连`，每个源都用 API 给的 digest 校验。
 - 定时器是「睡到点才醒」的进程，不是轮询；关掉时它根本不启动。
 
@@ -120,7 +122,7 @@ su -c "sh $M/updater.sh now"                   # 立刻查一次
 
 出包节奏跟着上游走：人肉统计了上游近 40 个 release 的发布时间（换算成北京）——**03:00–08:00 基本为 0**，
 高峰集中在 **11:00–23:00**，其中 **19–20 点最多**（19 点 8 次、20 点 5 次），夜间 00–02 点还有一小波。
-所以定时器定成**每 3 小时一次**（北京 `00:30 / 03:30 / … / 21:30`）：最新包最坏延迟 3 小时，
+所以定时器定成**每 3 小时一次**（cron 跑在 UTC，`30 */3` 落到北京 `02:30 / 05:30 / … / 23:30`）：最新包最坏延迟 3 小时，
 上游哪天换节奏也能自动跟上；判定到上游没变只花十几秒，公开仓库的 Actions 不计费。
 想立刻出包不用等：Actions 里手动跑 `build`，勾 `force` 即可。
 
