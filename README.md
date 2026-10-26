@@ -13,7 +13,7 @@
 
 ## 安装
 
-1. 从 [Releases](../../releases/latest) 下载 zip，在管理器里刷入；
+1. 从 [Releases](../../releases) 下载最新那个 zip（都是 pre-release，按日期取最上面一个），在管理器里刷入；
 2. 按音量键答两题（音量下＝下一项，音量上＝确认）——端口（当前值 / 3065 ↔ 52018）、自动更新（开/关，首次默认关）；
 3. 刷完**不用重启手机**：`customize.sh` 会把 `bin/`+`ui/` 同步到 `/data/adb/ag2a/rt/`，再用新脚本停旧起新；
 4. 打开 `http://127.0.0.1:3065/` 自己建管理员（密码 ≥8 位，不预设默认账号）。
@@ -116,7 +116,7 @@ su -c "sh $M/updater.sh now"                   # 立刻查一次
 | `src/` | 脚本壳（`module.prop`、`*.sh`、`webroot/`） |
 | `rootfs/` | 运行体，**不入库**，由 `scripts/ci/rootfs.sh` 从镜像抽取 |
 | `build_module.py` | 组装 zip：映射目录、校验 ELF 必须 aarch64、统一 LF、脚本 0755 |
-| `.github/workflows/build.yml` | 每天 03:30（北京）查上游，有新版自动出包并发 Release |
+| `.github/workflows/build.yml` | 每天 03:30（北京）查上游，有新版自动出包并发 **pre-release**（不占 Latest） |
 
 版本号是日期制 `YY.MM.DD_序号`，`versionCode = YYMMDD*100 + 序号`：
 

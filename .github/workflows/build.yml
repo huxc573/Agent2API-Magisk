@@ -81,7 +81,9 @@ jobs:
 
           上游：[aimod-cc/agent2api](https://github.com/aimod-cc/agent2api)（MIT）
           EOF
-          gh release create "v$V" "$zip" --title "$V" --notes-file notes.md
+          # 上游长期只有 beta/rc，我们不宣称「稳定版」：所有包一律 pre-release，
+          # 因此不会占用 Latest（Latest 永为空，用户按 Release 页的日期取最新）。
+          gh release create "v$V" "$zip" --title "$V" --notes-file notes.md --prerelease
 
       - name: 记账（UPSTREAM）
         if: steps.up.outputs.skip != '1'
