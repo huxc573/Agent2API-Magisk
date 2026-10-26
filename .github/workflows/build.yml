@@ -48,8 +48,9 @@ jobs:
           set -euo pipefail
           today=$(TZ=Asia/Shanghai date +%y.%m.%d)
           used=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[].tag_name' 2>/dev/null || true)
-          n=1
-          while printf '%s\n' "$used" | grep -qx "v${today}_${n}"; do n=$((n + 1)); done
+          # 取「已有最大序号 + 1」，不是「第一个空位」：删过旧 Release 后空位会重号
+          last=$(printf '%s\n' "$used" | sed -n "s|^v${today}_\([0-9]\{1,\}\)$|\1|p" | sort -n | tail -1)
+          n=$(( ${last:-0} + 1 ))
           v="${today}_${n}"
           echo "本次版本: v$v（versionCode $((10#${today//./} * 100 + n))）"
           echo "version=$v" >> "$GITHUB_OUTPUT"
