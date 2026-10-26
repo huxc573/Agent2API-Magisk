@@ -9,3 +9,4 @@ build/
 *.zip
 *.tgz
 __pycache__/
+notes.md

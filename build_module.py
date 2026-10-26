@@ -130,7 +130,7 @@ def main():
             with open(p, "wb") as f:
                 f.write(data)
 
-    zip_path = os.path.join(PUB, "ag2a-magisk-v%s.zip" % ver)
+    zip_path = os.path.join(PUB, "Agent2API-Magisk-v%s.zip" % ver)
     if os.path.exists(zip_path):
         os.remove(zip_path)
 

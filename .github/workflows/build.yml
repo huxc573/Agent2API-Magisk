@@ -70,7 +70,7 @@ jobs:
           UP: ${{ steps.up.outputs.tag }}
         run: |
           set -euo pipefail
-          zip="publish/ag2a-magisk-v${V}.zip"
+          zip="publish/Agent2API-Magisk-v${V}.zip"
           sha=$(sha256sum "$zip" | cut -d' ' -f1)
           cat > notes.md <<EOF
           模块版本 **$V**，打包的上游运行体 **$UP**（从官方镜像 \`aimodcc/agent2api\` 原样抽取）。
@@ -93,6 +93,11 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add UPSTREAM
+          # 上游没变时（force 出包）这里没有 diff，直接跳过，别让 git commit 以 1 退出
+          if git diff --cached --quiet; then
+            echo "UPSTREAM 没变，跳过提交"
+            exit 0
+          fi
           git commit -m "chore: 上游 → $UP"
           git push
 
