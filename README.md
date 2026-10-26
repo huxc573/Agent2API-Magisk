@@ -116,7 +116,13 @@ su -c "sh $M/updater.sh now"                   # 立刻查一次
 | `src/` | 脚本壳（`module.prop`、`*.sh`、`webroot/`） |
 | `rootfs/` | 运行体，**不入库**，由 `scripts/ci/rootfs.sh` 从镜像抽取 |
 | `build_module.py` | 组装 zip：映射目录、校验 ELF 必须 aarch64、统一 LF、脚本 0755 |
-| `.github/workflows/build.yml` | 每天 03:30（北京）查上游，有新版自动出包并发 **pre-release**（不占 Latest） |
+| `.github/workflows/build.yml` | 每 3 小时查上游，有新版自动出包并发 **pre-release**（不占 Latest） |
+
+出包节奏跟着上游走：人肉统计了上游近 40 个 release 的发布时间（换算成北京）——**03:00–08:00 基本为 0**，
+高峰集中在 **11:00–23:00**，其中 **19–20 点最多**（19 点 8 次、20 点 5 次），夜间 00–02 点还有一小波。
+所以定时器定成**每 3 小时一次**（北京 `00:30 / 03:30 / … / 21:30`）：最新包最坏延迟 3 小时，
+上游哪天换节奏也能自动跟上；判定到上游没变只花十几秒，公开仓库的 Actions 不计费。
+想立刻出包不用等：Actions 里手动跑 `build`，勾 `force` 即可。
 
 版本号是日期制 `YY.MM.DD_序号`，`versionCode = YYMMDD*100 + 序号`：
 
