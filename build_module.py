@@ -5,7 +5,7 @@
 用法: python build_module.py [版本号]
   - 源码壳:  src/           (module.prop / *.sh / customize.sh)
   - arm64 运行集: rootfs/    (usr/local/bin/agent2api-server + lib/*.so + app/ui + etc + usr/share/zoneinfo)
-  - 产物:    publish/ag2a-magisk-v<版本>.zip
+  - 产物:    publish/Agent2API-Magisk-v<版本>.zip
 
 rootfs/ 保持镜像内目录结构（usr/local/bin、app/ui、usr/share/zoneinfo），
 打包时映射到模块内的 bin/、ui/、zoneinfo/。

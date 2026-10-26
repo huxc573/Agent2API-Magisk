@@ -1,6 +1,6 @@
-# ag2a Magisk 模块变更记录
+# Agent2API-Magisk 变更记录
 
-产物：`publish/ag2a-magisk-vX.Y.Z.zip`
+产物：`publish/Agent2API-Magisk-vX.Y.Z.zip`
 上游二进制版本记在 `module.prop` 的 `version=… (ag2a <版本>)`。
 
 ---
