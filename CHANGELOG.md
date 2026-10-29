@@ -5,7 +5,11 @@
 
 ---
 
-## 26.10.30_4（当前）
+## 26.10.30_5（当前）
+
+- **修管理器的「有更新」提示不再出现**：`module.prop` 的 `updateJson` 之前是 `https://gh-proxy.com/https://raw.githubusercontent.com/…/update.json`，多一跳镜像、还可能被管理器判超时；拉不到 update.json 就等于「永远是最新」。现在改成 GitHub Pages 直链 `https://huxc573.github.io/Agent2API-Magisk/update.json`，与 workbuddy2api-panel-magisk 完全一致（占位符 `__AG2A_PAGES__` 由打包时注入）。
+
+## 26.10.30_4
 
 - **运行体改钉 `3.3.0-beta.5.1`**：`3.3.0-beta.5.1` 的官方镜像已经推出来了（Docker Hub 有这个 tag），里面就是修掉启动 panic 的版本；`26.10.30_1` 临时用的 beta.4 作废。
 - **修管理器的「更新日志」显示成一坨 HTML**：`update.json` 的 `changelog` 之前指向 `github.com/…/blob/main/CHANGELOG.md`（网页），管理器把整页 HTML 当文本抓下来显示。现在改走 GitHub Pages（源＝main 根目录）`https://huxc573.github.io/Agent2API-Magisk/CHANGELOG.md`，纯文本直连可用，跟 workbuddy2api-panel-magisk 一个写法。

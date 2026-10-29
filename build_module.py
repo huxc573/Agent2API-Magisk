@@ -83,15 +83,21 @@ def main():
     # 1c) 注入本仓库地址：WebUI 的「打开 GitHub 更新地址」+ module.prop 的 updateJson。
     #     CI 传 $AG2A_SELF_REPO=${{ github.repository }}；本地构建用下面默认值。
     #     二进制替换，避免换行/编码搅乱；漏替换在打包前直接报错。
+    #     updateJson 走 GitHub Pages（raw.githubusercontent 国内连不上，gh-proxy 又要多一跳、
+    #     还可能被管理器判超时 ⇒ 拉不到 update.json 就等于「永远没更新」）。
     self_repo = os.environ.get("AG2A_SELF_REPO", "huxc573/Agent2API-Magisk").strip()
-    token = b"__AG2A_REPO__"
+    _owner, _, _name = self_repo.partition("/")
+    pages = ("%s.github.io/%s" % (_owner, _name)) if _name else ""
+    subs = [(b"__AG2A_REPO__", self_repo.encode("utf-8")),
+            (b"__AG2A_PAGES__", pages.encode("utf-8"))]
     for rel in ("webroot/index.html", "module.prop"):
         p = os.path.join(STAGE, rel.replace("/", os.sep))
         with open(p, "rb") as f:
             data = f.read()
-        if token in data:
-            with open(p, "wb") as f:
-                f.write(data.replace(token, self_repo.encode("utf-8")))
+        for tok, val in subs:
+            data = data.replace(tok, val)
+        with open(p, "wb") as f:
+            f.write(data)
 
     # 2) 运行集（ELF 架构校验）
     for src, rel in RUNTIME.items():
@@ -159,8 +165,10 @@ def main():
             if fn.endswith((".html", ".prop")):
                 p = os.path.join(root, fn)
                 with open(p, "rb") as f:
-                    if token in f.read():
-                        sys.exit("占位符 %s 未替换: %s" % (token.decode(), p))
+                    _d = f.read()
+                for _tok, _v in subs:
+                    if _tok in _d:
+                        sys.exit("占位符 %s 未替换: %s" % (_tok.decode(), p))
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for root, dirs, files in os.walk(STAGE):
