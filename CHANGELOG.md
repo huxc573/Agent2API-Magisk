@@ -5,10 +5,10 @@
 
 ---
 
-## 26.10.30_3（当前）
+## 26.10.30_4（当前）
 
 - **运行体改钉 `3.3.0-beta.5.1`**：`3.3.0-beta.5.1` 的官方镜像已经推出来了（Docker Hub 有这个 tag），里面就是修掉启动 panic 的版本；`26.10.30_1` 临时用的 beta.4 作废。
-- **修管理器的「更新日志」显示成一坨 HTML**：`update.json` 的 `changelog` 之前指向 `github.com/…/blob/main/CHANGELOG.md`（网页），管理器把整页 HTML 当文本抓下来显示。现在 CI 另存一份只含本次说明的 `changelog.md`，`changelog` 指向它的 raw 直链（走 gh-proxy 镜像）。
+- **修管理器的「更新日志」显示成一坨 HTML**：`update.json` 的 `changelog` 之前指向 `github.com/…/blob/main/CHANGELOG.md`（网页），管理器把整页 HTML 当文本抓下来显示。现在改走 GitHub Pages（源＝main 根目录）`https://huxc573.github.io/Agent2API-Magisk/CHANGELOG.md`，纯文本直连可用，跟 workbuddy2api-panel-magisk 一个写法。
 
 ## 26.10.30_1
 
