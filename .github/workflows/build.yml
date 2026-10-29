@@ -86,7 +86,7 @@ jobs:
           - 安装：在管理器里刷入 zip（APatch / Magisk / KernelSU）；**首次安装要重启一次**，升级安装刷完即生效
           - 升级时运行体在 \`/data/adb/ag2a/rt/\` 立即换新；两个按钮的面板入口需重启一次才换成新版
 
-          上游：[aimod-cc/agent2api](https://github.com/aimod-cc/agent2api)（MIT）
+          上游运行体：[aimod-cc/agent2api v$UP](https://github.com/aimod-cc/agent2api/releases/tag/v$UP)（MIT）
           EOF
           # 上游长期只有 beta/rc，我们不宣称「稳定版」：所有包一律 pre-release，
           # 因此不会占用 Latest（Latest 永为空，用户按 Release 页的日期取最新）。
