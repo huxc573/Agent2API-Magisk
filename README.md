@@ -118,7 +118,7 @@ su -c "sh $M/updater.sh now"                   # 立刻查一次
 | `src/` | 脚本壳（`module.prop`、`*.sh`、`webroot/`） |
 | `rootfs/` | 运行体，**不入库**，由 `scripts/ci/rootfs.sh` 从镜像抽取 |
 | `build_module.py` | 组装 zip：映射目录、校验 ELF 必须 aarch64、统一 LF、脚本 0755 |
-| `.github/workflows/build.yml` | 定时查上游（cron `30 */3`），有新版就出包并发 **pre-release**（不占 Latest） |
+| `.github/workflows/build.yml` | 每小时查上游（cron `30 * * * *`），有新版就出包并发 **pre-release**（不占 Latest） |
 
 上游一发版，下一轮定时就会出包；想立刻出包不用等，在 Actions 里手动跑 `build`（勾 `force` 可强制出）。
 
