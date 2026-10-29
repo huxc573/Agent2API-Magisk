@@ -140,6 +140,29 @@ stop_update_timer() {
     return 0
 }
 
+# ---------- 起不来时留证据 ----------
+# 网关自己崩掉时日志有报错；但如果它连一行都没打出来（loader 找不到、ELF 不兼容、
+# 配置写坏直接退出），run.log 里就什么都没有，只剩看门狗在「重拉」。
+# 这里在「确认没进程、端口也没监听」时手动跑一次二进制，把真实报错留在 run.log 里，
+# 面板「打开」页的日志块和 check.sh 都能直接看到。
+# ⚠ 只在没进程时跑：有实例在跑时再起一个只会撞端口，日志全是假的。
+diag_dump() {
+    [ -n "$(ag2a_pids)" ] && return 0
+    _db=$(ag2a_bin)
+    {
+        echo "$(date '+%m-%d %H:%M') [diag] 端口 ${1:-?} 未监听，自检开始"
+        echo "[diag] bin=$_db rtver=$(ag2a_rtver) modver=$(ag2a_modver) rt需要同步=$(ag2a_rt_need_sync && echo 是 || echo 否)"
+        echo "[diag] 依赖:"
+        "$MODDIR/lib/$AG2A_LD_NAME" --library-path "$MODDIR/lib" --list "$_db" 2>&1 | head -n 8
+        echo "[diag] 前台直跑 6 秒（真正的报错应该在这几行）:"
+        ( cd "$WORK" && exec "$MODDIR/lib/$AG2A_LD_NAME" --library-path "$MODDIR/lib" "$_db" ) 2>&1 &
+        _dp=$!
+        sleep 6
+        kill -9 "$_dp" 2>/dev/null
+        echo "[diag] 自检结束"
+    } >> "$WORK/run.log" 2>&1
+}
+
 case "$1" in
     stop)    stop_watchdog; stop_gw; stop_update_timer; exit 0 ;;
     # ⛔ restart 必须落到 start 分支：只写「停三件套」的话，后面
@@ -236,6 +259,8 @@ if [ -z "$1" ] || [ "$1" = "start" ]; then
     if ag2a_port_listen "$PORT_FORCED"; then
         exit 0
     fi
+    # 后台自检（约 6 秒）写进 run.log，写完再刷一次说明行；不让点按钮的人多等
+    ( diag_dump "$PORT_FORCED"; sh "$MODDIR/refresh.sh" quiet ) >/dev/null 2>&1 &
     echo "[ag2a] 网关 15 秒内没有监听端口 $PORT_FORCED，详见 $WORK/run.log" >&2
     exit 1
 fi

@@ -34,8 +34,9 @@ else
     ST="未运行"
     # 起不来的原因就写在 run.log 里（watchdog 把网关的 stdout/stderr 直接重定向进去）。
     # 摘要进说明行，管理器列表里不用开终端就能看到为什么没起来。
-    # 跳过 watchdog 自己的「退出/重拉」行 —— 那句只说重试了，不说为什么。
-    _last=$(tail -n 40 "$WORK/run.log" 2>/dev/null | grep -v '\[watchdog\]' | grep -v '^[[:space:]]*$' | tail -n 1 | tr -d '\r')
+    # 跳过看门狗的「退出/重拉」行和我们自己 [diag] 的框线行 —— 它们只说重试了，
+    # 不说为什么；滤掉之后最后一行就是网关自己的报错。
+    _last=$(tail -n 40 "$WORK/run.log" 2>/dev/null | grep -v -e '\[watchdog\]' -e '\[diag\]' | grep -v '^[[:space:]]*$' | tail -n 1 | tr -d '\r')
     _last=$(printf '%s' "$_last" | cut -c1-56)
 fi
 PORT=$(ag2a_get_port)

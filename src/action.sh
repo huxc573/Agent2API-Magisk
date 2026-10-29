@@ -189,6 +189,11 @@ auto)
 refresh)
     sh "$MODDIR/refresh.sh" "$2"
     exit 0 ;;
+log)
+    # 网关日志（面板「打开」页下面那块显示的就是这个文件的尾部）。
+    # 行数可调：sh action.sh log 120
+    tail -n "${2:-40}" "$WORK/run.log" 2>/dev/null || echo "没有 $WORK/run.log"
+    exit 0 ;;
 start)
     sh "$MODDIR/service.sh" start
     sh "$MODDIR/refresh.sh" quiet >/dev/null 2>&1
