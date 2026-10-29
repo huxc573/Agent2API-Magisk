@@ -80,6 +80,19 @@ def main():
         sys.exit("缺少 webroot 目录")
     shutil.copytree(wr, os.path.join(STAGE, "webroot"))
 
+    # 1c) 注入本仓库地址：WebUI 的「打开 GitHub 更新地址」+ module.prop 的 updateJson。
+    #     CI 传 $AG2A_SELF_REPO=${{ github.repository }}；本地构建用下面默认值。
+    #     二进制替换，避免换行/编码搅乱；漏替换在打包前直接报错。
+    self_repo = os.environ.get("AG2A_SELF_REPO", "huxc573/Agent2API-Magisk").strip()
+    token = b"__AG2A_REPO__"
+    for rel in ("webroot/index.html", "module.prop"):
+        p = os.path.join(STAGE, rel.replace("/", os.sep))
+        with open(p, "rb") as f:
+            data = f.read()
+        if token in data:
+            with open(p, "wb") as f:
+                f.write(data.replace(token, self_repo.encode("utf-8")))
+
     # 2) 运行集（ELF 架构校验）
     for src, rel in RUNTIME.items():
         if not os.path.isfile(src):
@@ -133,6 +146,15 @@ def main():
     zip_path = os.path.join(PUB, "Agent2API-Magisk-v%s.zip" % ver)
     if os.path.exists(zip_path):
         os.remove(zip_path)
+
+    # 占位符漏替换 = updateJson / WebUI 指向不存在的仓库，直接拦下
+    for root, _dirs, files in os.walk(STAGE):
+        for fn in files:
+            if fn.endswith((".html", ".prop")):
+                p = os.path.join(root, fn)
+                with open(p, "rb") as f:
+                    if token in f.read():
+                        sys.exit("占位符 %s 未替换: %s" % (token.decode(), p))
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for root, dirs, files in os.walk(STAGE):

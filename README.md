@@ -24,13 +24,29 @@
 
 | 按钮 | 来源 | 行为 |
 |---|---|---|
-| **打开** | `webroot/index.html` | 读 `/data/adb/ag2a/port` 拿端口，直接跳进面板 |
+| **打开** | `webroot/index.html` | 集成面板：端口、进程状态、模块版本/运行体、有无新版；三个按钮＝打开面板 / 用浏览器打开 / 打开 GitHub 更新地址 |
 | **执行** | `action.sh` | 重启网关进程，并推一条系统通知报结果 |
 | **卸载** | 管理器自带 | 走 `uninstall.sh`，只删自己那三个写死路径 |
 
 - 「打开」依赖管理器的模块 WebUI：APatch（≥10568）、KernelSU 及各分支原生支持；Magisk 上游没有 WebView，装 KsuWebUI 或 MMRL 才会出现。没有也不影响，`sh action.sh open` 用系统浏览器打开。
+- 面板里的「更新」一栏读的是仓库的 `update.json`（跟管理器自己弹的更新提示同一个数据源）；网络不通就只显示「查不到」，点下面的按钮自己看。
 - ⚠ 这两个按钮的行为由模块目录里的脚本决定，**刷完要重启一次**才换成新版（服务本身不受影响）。
 - ⚠ 点「执行」成功后管理器会自己退回列表（APatch `ExecuteAPMActionScreen` 里的 `popBackStack()`，脚本控制不了）。结果看通知，或看模块说明行：`运行中 · IP:端口 · 23:25 启动 ｜ 执行=重启进程`。
+
+## 管理器里的更新提示
+
+`module.prop` 里有一行 `updateJson=`，指向仓库根目录的 `update.json`：
+
+```json
+{ "version": "26.10.29_1", "versionCode": 26102901,
+  "zipUrl": "https://github.com/…/releases/download/v26.10.29_1/Agent2API-Magisk-v26.10.29_1.zip",
+  "changelog": "https://github.com/…/blob/main/CHANGELOG.md" }
+```
+
+Magisk / KernelSU / APatch 都会读这行，拿 `update.json` 的 `versionCode` 和本机的比，**大于本机就在模块列表里显示「更新」**，点一下直接下 `zipUrl` 刷入。每次 CI 出包后自动重写这个文件并提交，所以它永远指向最新那个 zip——这也是为什么包全是 pre-release 也不影响管理器更新（管理器不看 Release 的「Latest」，只看这个 JSON）。
+
+- ⚠ `update.json` 托管在 `raw.githubusercontent.com`，国内网络可能拿不到，那就看不到更新提示；直接去 Releases 页刷最新 zip 效果一样。
+- ⚠ 装的是**旧版（没有 updateJson 那几版）**的，要手动刷一次新版，之后才会有提示。
 
 ## 常用命令
 
@@ -117,7 +133,8 @@ su -c "sh $M/updater.sh now"                   # 立刻查一次
 |---|---|
 | `src/` | 脚本壳（`module.prop`、`*.sh`、`webroot/`） |
 | `rootfs/` | 运行体，**不入库**，由 `scripts/ci/rootfs.sh` 从镜像抽取 |
-| `build_module.py` | 组装 zip：映射目录、校验 ELF 必须 aarch64、统一 LF、脚本 0755 |
+| `build_module.py` | 组装 zip：注入仓库地址、映射目录、校验 ELF 必须 aarch64、统一 LF、脚本 0755 |
+| `update.json` | 管理器更新源（CI 每次出包后重写并提交） |
 | `.github/workflows/build.yml` | 每小时查上游（cron `30 * * * *`），有新版就出包并发 **pre-release**（不占 Latest） |
 
 上游一发版，下一轮定时就会出包；想立刻出包不用等，在 Actions 里手动跑 `build`（勾 `force` 可强制出）。
