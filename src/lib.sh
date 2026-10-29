@@ -248,18 +248,19 @@ ag2a_watchdog_pid() {
 }
 
 # ---------- 证书 ----------
-# rustls 不内嵌根证书（实测 BEGIN CERTIFICATE 计数 0），必须给 SSL_CERT_DIR/SSL_CERT_FILE。
+# rustls 不内嵌根证书（实测 BEGIN CERTIFICATE 计数 0），必须给 SSL_CERT_FILE。
 # 候选顺序：模块自带 → Android 13- 的 cacerts → Android 14+ 的 conscrypt APEX
+# ⚠ 必须带 export：调用方是 `eval "$(ag2a_cert_env)"`，不加 export 只是给当前 shell
+#   设了个变量，随后 exec 出去的网关（和它 spawn 的插件）一个都看不到 ⇒ rustls 没根证书。
 ag2a_cert_env() {
     if [ -f "$MODDIR/etc/ca-certificates.crt" ]; then
-        echo "SSL_CERT_FILE=$MODDIR/etc/ca-certificates.crt"
-        echo "SSL_CERT_DIR=$MODDIR/etc/certs"
+        echo "export SSL_CERT_FILE=$MODDIR/etc/ca-certificates.crt"
         return
     fi
     for _d in /system/etc/security/cacerts \
               /apex/com.android.conscrypt/cacerts; do
         if [ -d "$_d" ]; then
-            echo "SSL_CERT_DIR=$_d"
+            echo "export SSL_CERT_DIR=$_d"
             return
         fi
     done
@@ -268,9 +269,10 @@ ag2a_cert_env() {
 # ---------- 时区 ----------
 # 二进制读 /usr/share/zoneinfo（实测命中 TZif 与路径字符串）。
 # TZ 直接给文件绝对路径时 glibc 不再拼 zoneinfo 目录，所以可以指模块内的单个 tzfile。
+# ⚠ 同样必须 export（否则网关仍按 UTC 算签到/额度窗口）。
 ag2a_tz_env() {
     if [ -f "$MODDIR/zoneinfo/Asia/Shanghai" ]; then
-        echo "TZ=$MODDIR/zoneinfo/Asia/Shanghai"
+        echo "export TZ=$MODDIR/zoneinfo/Asia/Shanghai"
     fi
 }
 

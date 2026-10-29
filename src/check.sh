@@ -27,6 +27,8 @@ echo "== 直跑二进制（-h / --help，预期打印用法或报 flag 错误，
 export AGENT2API_PROXY_HOME="$WORK" HOME="$WORK" AGENT2API_UI_DIR="$(ag2a_ui)"
 eval "$(ag2a_cert_env)"
 eval "$(ag2a_tz_env)"
+# 打印「子进程真实可见」的那几个 env：漏了 export 这里就是空的（一眼可见）
+echo "  env 交给网关: $(env | grep -E '^(SSL_CERT_FILE|SSL_CERT_DIR|TZ|AGENT2API_PROXY_HOME|AGENT2API_UI_DIR|HOME)=' | tr '\n' ' ')"
 "$MODDIR/lib/ld-linux-aarch64.so.1" --library-path "$MODDIR/lib" --list "$(ag2a_bin)" 2>&1 | head -n 8
 
 echo "== 端口监听（网关起来后才会有）=="
