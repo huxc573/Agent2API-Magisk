@@ -38,15 +38,15 @@
 `module.prop` 里有一行 `updateJson=`，指向仓库根目录的 `update.json`：
 
 ```json
-{ "version": "26.10.29_1", "versionCode": 26102901,
-  "zipUrl": "https://github.com/…/releases/download/v26.10.29_1/Agent2API-Magisk-v26.10.29_1.zip",
+{ "version": "26.10.29_2", "versionCode": 26102902,
+  "zipUrl": "https://gh-proxy.com/https://github.com/…/releases/download/v26.10.29_2/…zip",
   "changelog": "https://github.com/…/blob/main/CHANGELOG.md" }
 ```
 
-Magisk / KernelSU / APatch 都会读这行，拿 `update.json` 的 `versionCode` 和本机的比，**大于本机就在模块列表里显示「更新」**，点一下直接下 `zipUrl` 刷入。每次 CI 出包后自动重写这个文件并提交，所以它永远指向最新那个 zip——这也是为什么包全是 pre-release 也不影响管理器更新（管理器不看 Release 的「Latest」，只看这个 JSON）。
+Magisk / KernelSU / APatch 都会读这行，拿 `update.json` 的 `versionCode` 和本机的比，**大于本机就在模块列表里显示「更新」**，点一下直接下 `zipUrl` 刷入。每次 CI 出包后按打好的 zip 自动重写这个文件并提交，所以它永远指向最新那个包——这也是为什么包全是 pre-release 也不影响管理器更新（管理器不看 Release 的「Latest」，只看这个 JSON）。
 
-- ⚠ `update.json` 托管在 `raw.githubusercontent.com`，国内网络可能拿不到，那就看不到更新提示；直接去 Releases 页刷最新 zip 效果一样。
-- ⚠ 装的是**旧版（没有 updateJson 那几版）**的，要手动刷一次新版，之后才会有提示。
+- ⚠ **两个地址都套了 `gh-proxy.com` 镜像**。实测国内直连 `raw.githubusercontent.com` 和 `github.com/…/releases/download/…` 都是超时（000），gh-proxy 1~5 秒能拿到；镜像挂了就改一行 URL 重新出包，或者直接去 Releases 页手动刷。
+- ⚠ 装的是**旧版（没有 updateJson 的那几版）**的，要手动刷一次新版，之后才会有提示。
 
 ## 常用命令
 

@@ -104,11 +104,14 @@ jobs:
           # version / versionCode 直接从打好的包里读，杜绝手抄错位。
           ver=$(unzip -p "$zip" module.prop | sed -n 's/^version=//p' | cut -d' ' -f1)
           vc=$(unzip -p "$zip" module.prop | sed -n 's/^versionCode=//p')
+          # 资产直链走 gh-proxy 镜像：国内直连 github.com/releases/download 基本拉不动，
+          # 管理器点了「更新」也下不下来。要直连的话把 GH_PROXY 置空即可。
+          GH_PROXY="https://gh-proxy.com/"
           cat > update.json <<EOF
           {
             "version": "$ver",
             "versionCode": $vc,
-            "zipUrl": "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/v${V}/$(basename "$zip")",
+            "zipUrl": "${GH_PROXY}${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/v${V}/$(basename "$zip")",
             "changelog": "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md"
           }
           EOF

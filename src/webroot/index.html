@@ -71,7 +71,9 @@
   // 仓库地址由 build_module.py 按 $AG2A_SELF_REPO 注入（CI 传 ${{ github.repository }}）
   var REPO = '__AG2A_REPO__';
   var REL = 'https://github.com/' + REPO + '/releases';
-  var UPD = 'https://raw.githubusercontent.com/' + REPO + '/main/update.json';
+  // 走 gh-proxy 镜像：国内直连 raw.githubusercontent.com 基本不通；不通再退回直连试一次
+  var UPD = ['https://gh-proxy.com/https://raw.githubusercontent.com/' + REPO + '/main/update.json',
+             'https://raw.githubusercontent.com/' + REPO + '/main/update.json'];
 
   // ---------- 端口 ----------
   var PORT = 3065, raw = sh('cat /data/adb/ag2a/port');
@@ -100,24 +102,29 @@
   // 读仓库里的 update.json —— 与管理器里「更新」按钮同一个数据源，比对 versionCode
   var upd = document.getElementById('upd');
   var cur = (mver.split(' ')[0] || '');
-  var x = new XMLHttpRequest();
-  x.open('GET', UPD, true);
-  x.timeout = 8000;
-  x.onload = function () {
-    if (x.status !== 200) { upd.innerHTML = '<span class="dim">查不到（点下面自己看）</span>'; return; }
-    var j;
-    try { j = JSON.parse(x.responseText); } catch (e) { upd.innerHTML = '<span class="dim">数据异常，点下面自己看</span>'; return; }
-    var rv = String(j.version || ''), rc = +j.versionCode || 0;
-    if (!rc) { upd.innerHTML = '<span class="dim">数据异常</span>'; return; }
-    if (!mcode) { upd.innerHTML = '<span class="dim">本机版本读不到，最新 ' + rv + '</span>'; return; }
-    upd.innerHTML = rc > +mcode
-      ? '<span class="warn">有新版 ' + rv + '</span> <span class="dim">（本机 ' + cur + '）</span>'
-      : '<span class="ok">已是最新</span> <span class="dim">' + rv + '</span>';
-  };
-  x.onerror = x.ontimeout = function () {
-    upd.innerHTML = '<span class="dim">网络不通，点下面 Releases 自己看</span>';
-  };
-  x.send();
+  function probe(i) {
+    if (i >= UPD.length) {
+      upd.innerHTML = '<span class="dim">网络不通，点下面 Releases 自己看</span>';
+      return;
+    }
+    var x = new XMLHttpRequest();
+    x.open('GET', UPD[i], true);
+    x.timeout = 8000;
+    x.onload = function () {
+      if (x.status !== 200) { probe(i + 1); return; }
+      var j;
+      try { j = JSON.parse(x.responseText); } catch (e) { probe(i + 1); return; }
+      var rv = String(j.version || ''), rc = +j.versionCode || 0;
+      if (!rc) { probe(i + 1); return; }
+      if (!mcode) { upd.innerHTML = '<span class="dim">本机版本读不到，最新 ' + rv + '</span>'; return; }
+      upd.innerHTML = rc > +mcode
+        ? '<span class="warn">有新版 ' + rv + '</span> <span class="dim">（本机 ' + cur + '）</span>'
+        : '<span class="ok">已是最新</span> <span class="dim">' + rv + '</span>';
+    };
+    x.onerror = x.ontimeout = function () { probe(i + 1); };
+    x.send();
+  }
+  probe(0);
 
   // ---------- 按钮 ----------
   function openUrl(u) {
