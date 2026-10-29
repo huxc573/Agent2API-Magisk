@@ -6,7 +6,18 @@ set -euo pipefail
 IN="${1:-}"
 REPOS=("aimod-cc/agent2api" "Agent2API/agent2api")
 
+# 钉版：仓库根有 UPSTREAM_PIN（非空）就只认它，手动传的 tag 也不生效 ——
+# 上游发过「headless 起不来」的版本（3.3.0-beta.5：update/mod.rs 在非运行时
+# 里 tokio::spawn，启动即 panic rc=134），钉住能保证每小时轮询不会把坏版本
+# 又推上来。要恢复跟随最新，删掉这个文件即可。
+PIN="$(cat UPSTREAM_PIN 2>/dev/null | tr -d ' \r\n' || true)"
+PIN="${PIN#v}"
+
 TAG="$IN"
+if [ -n "$PIN" ]; then
+    [ "$TAG" = "$PIN" ] || echo "::notice::已钉版到 $PIN，忽略输入/最新 tag（${TAG:-空}）"
+    TAG="$PIN"
+fi
 if [ -z "$TAG" ]; then
     for r in "${REPOS[@]}"; do
         t=$(gh api "repos/$r/releases?per_page=20" \

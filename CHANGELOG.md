@@ -5,7 +5,13 @@
 
 ---
 
-## 26.10.29_7（当前）
+## 26.10.29_8（当前）
+
+- **钉回上游 `3.3.0-beta.4`**：beta.5 的 headless 启动是坏的 —— 二进制在 `server/src/server/core/update/mod.rs:518` 里 `tokio::spawn`，而这一段跑在还没有 Tokio 运行时的主线程上，进程启动即 `panic: there is no reactor running`、`rc=134`，看门狗反复重拉也起不来（上游 issue #391，官方答复是升 `3.3.0-beta.5.1`，但截至本包只有 tag、没有 release 资产）。上游 `main` 已把 `init_global` 里的 spawn 删掉，模块侧改不了二进制，只能钉版等它发新包。
+- 新增 `UPSTREAM_PIN`：仓库根这个文件非空时，每小时轮询与手动触发的 tag 都只认它，避免自动把坏版本再推上来；上游发了可用的新版就删掉它恢复跟随。
+- ⚠`_7` 里那条「证书/时区 env 没 export」是真 bug，但不是这次起不来的原因。
+
+## 26.10.29_7
 
 - **修证书/时区 env 没导出**：`ag2a_cert_env` / `ag2a_tz_env` 只 echo 了 `SSL_CERT_FILE=…`、`TZ=…`，而调用方是 `eval "$(…)"` —— 不加 `export` 就只是给当前 shell 设了个变量，随后 `exec` 出去的网关（和它 spawn 的插件）根本看不到：rustls 拿不到根证书、时间按 UTC 走。现在两个函数都带 `export`；顺手去掉指向不存在目录的 `SSL_CERT_DIR=$MODDIR/etc/certs`。`check.sh` 增加一行「env 交给网关」把子进程真正可见的 env 打出来，漏 export 一眼可见。
 
