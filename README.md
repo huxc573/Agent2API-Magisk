@@ -39,14 +39,15 @@
 `module.prop` 里有一行 `updateJson=`，指向仓库根目录的 `update.json`：
 
 ```json
-{ "version": "26.10.29_2", "versionCode": 26102902,
-  "zipUrl": "https://gh-proxy.com/https://github.com/…/releases/download/v26.10.29_2/…zip",
-  "changelog": "https://github.com/…/blob/main/CHANGELOG.md" }
+{ "version": "26.10.30_4", "versionCode": 26103004,
+  "zipUrl": "https://gh-proxy.com/https://github.com/…/releases/download/v26.10.30_4/…zip",
+  "changelog": "https://huxc573.github.io/Agent2API-Magisk/CHANGELOG.md" }
 ```
 
 Magisk / KernelSU / APatch 都会读这行，拿 `update.json` 的 `versionCode` 和本机的比，**大于本机就在模块列表里显示「更新」**，点一下直接下 `zipUrl` 刷入。每次 CI 出包后按打好的 zip 自动重写这个文件并提交，所以它永远指向最新那个包——这也是为什么包全是 pre-release 也不影响管理器更新（管理器不看 Release 的「Latest」，只看这个 JSON）。
 
-- ⚠ **两个地址都套了 `gh-proxy.com` 镜像**。实测国内直连 `raw.githubusercontent.com` 和 `github.com/…/releases/download/…` 都是超时（000），gh-proxy 1~5 秒能拿到；镜像挂了就改一行 URL 重新出包，或者直接去 Releases 页手动刷。
+- ⚠ `zipUrl` 套了 `gh-proxy.com` 镜像：实测国内直连 `raw.githubusercontent.com` 和 `github.com/…/releases/download/…` 都是超时（000）。镜像挂了就改一行 URL 重新出包，或者直接去 Releases 页手动刷。
+- `changelog` 走 **GitHub Pages**（源＝main 根目录），不能指向 `github.com/…/blob/…` 网页——管理器抓到的是整页 HTML，更新日志里会显示成一堆 `<meta>` / `<link>`。
 - ⚠ 装的是**旧版（没有 updateJson 的那几版）**的，要手动刷一次新版，之后才会有提示。
 
 ## 常用命令
