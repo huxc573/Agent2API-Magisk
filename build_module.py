@@ -115,14 +115,20 @@ def main():
     shutil.copytree(ui_src, ui_dst)
     ui_files = sum(len(f) for _, _, f in os.walk(ui_dst))
 
-    # 4) module.prop：只换版本号，保留上游版本标注
+    # 4) module.prop：换版本号 + 上游版本标注
+    #    上游版本**必须**取 CI 传进来的 $UPSTREAM_TAG：从源码里读会一直停在上次手写的那个
+    #    （26.10.26_4 之后一直是 beta.4，CI 抓的是 beta.5，列表里就显示成旧的上游版本）。
     mp = os.path.join(STAGE, "module.prop")
     with open(mp, "r", encoding="utf-8") as f:
         raw = f.read()
-    up = ""
-    for ln in raw.splitlines():
-        if ln.startswith("version=") and "(ag2a " in ln:
-            up = ln[ln.index("(ag2a "):]
+    up_env = os.environ.get("UPSTREAM_TAG", "").strip()
+    if up_env:
+        up = "(ag2a %s)" % up_env
+    else:
+        up = ""
+        for ln in raw.splitlines():
+            if ln.startswith("version=") and "(ag2a " in ln:
+                up = ln[ln.index("(ag2a "):]
     out = []
     for ln in raw.splitlines():
         if ln.startswith("version="):

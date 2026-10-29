@@ -32,6 +32,11 @@ elif ag2a_running; then
     _run=1
 else
     ST="未运行"
+    # 起不来的原因就写在 run.log 里（watchdog 把网关的 stdout/stderr 直接重定向进去）。
+    # 摘要进说明行，管理器列表里不用开终端就能看到为什么没起来。
+    # 跳过 watchdog 自己的「退出/重拉」行 —— 那句只说重试了，不说为什么。
+    _last=$(tail -n 40 "$WORK/run.log" 2>/dev/null | grep -v '\[watchdog\]' | grep -v '^[[:space:]]*$' | tail -n 1 | tr -d '\r')
+    _last=$(printf '%s' "$_last" | cut -c1-56)
 fi
 PORT=$(ag2a_get_port)
 [ -n "$PORT" ] || PORT=${AG2A_DEFAULT_PORT:-3065}
@@ -43,6 +48,7 @@ case "$ST" in
     *停用* | *缺少*) : ;;
     *) ST="$ST ｜ 执行=重启进程" ;;
 esac
+[ -n "$_last" ] && ST="$ST ｜ 最近: $_last"
 
 # ---- 写 module.prop（只写这一行，写临时文件再 mv；不用 sed -i，某些挂载点会静默失败） ----
 _mp="$MODDIR/module.prop"
