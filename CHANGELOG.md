@@ -5,7 +5,17 @@
 
 ---
 
-## 26.10.30_5（当前）
+## 26.10.30_6（当前）
+
+- **修「点执行 / 重启手机后，说明行的 IP:端口 和启动时间不刷新」**：刷新说明行原来只有一条触发路径（`service.sh start` 跑到最后），APatch 执行 action 有超时、开机时进程已被看门狗拉起又走早退分支，两条路都刷不到。
+  - `service.sh` 早退分支补刷（开机场景）；
+  - `service.sh run` 起网关后 3 秒由后台子 shell 刷（不依赖外层是否跑到最后）；
+  - `action.sh` 点「执行」在 restart 返回后无条件再刷一次；`sh action.sh restart` 同样处理；
+  - 启动时刻改为**读网关进程自己的启动时间**（`date -r /proc/<pid>`），刷新被延后/重复也不会把「没重启」显示成「刚启动」；顺带带上日期（`10-30 00:40 启动`），跨天一眼能看出是旧的。
+- **运行体改为「Release 资产优先」**：上游的 `agent2api-server-linux-arm64.tar.gz` 里除了二进制还带着整份 `ui/`，并配 `.sha256`；现在先下资产、校验通过就用它（不再只认 Docker 镜像），资产缺失才回退镜像；镜像只负责补 `so` / 根证书 / 时区。以后上游只发 tag 不发镜像也能出包。
+- **Release 说明直接写变更正文**：以前只有一句「上游运行体 vX」+ 一个链接，而上游经常只有 tag 不发 Release（`3.3.0-beta.5.1` 即如此），甚至事后删 tag，点开就是 404。现在说明里直接抄「本模块这次改了什么」（取自本文档对应小节）和「上游这版改了什么」（Release 正文，没有就取该 tag 的提交信息），链接只作补充。
+
+## 26.10.30_5
 
 - **修管理器的「有更新」提示不再出现**：`module.prop` 的 `updateJson` 之前是 `https://gh-proxy.com/https://raw.githubusercontent.com/…/update.json`，多一跳镜像、还可能被管理器判超时；拉不到 update.json 就等于「永远是最新」。现在改成 GitHub Pages 直链 `https://huxc573.github.io/Agent2API-Magisk/update.json`，与 workbuddy2api-panel-magisk 完全一致（占位符 `__AG2A_PAGES__` 由打包时注入）。
 

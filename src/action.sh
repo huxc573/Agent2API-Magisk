@@ -216,9 +216,12 @@ open)
         echo "→ 已打开浏览器" || echo "→ 打开浏览器失败，手动访问上面的地址"
     exit 0 ;;
 restart)
-    sh "$MODDIR/service.sh" restart >/dev/null 2>&1 &&
-        echo "网关已重启（pid $(ag2a_pids | tr '\n' ' ' | sed 's/ *$//')）" ||
+    if sh "$MODDIR/service.sh" restart >/dev/null 2>&1; then
+        echo "网关已重启（pid $(ag2a_pids | tr '\n' ' ' | sed 's/ *$//')）"
+    else
         echo "重启失败：端口 $(ag2a_get_port) 没有监听，详见 $(ag2a_data_dir)/run.log"
+    fi
+    sh "$MODDIR/refresh.sh" quiet >/dev/null 2>&1
     exit 0 ;;
 esac
 
@@ -252,6 +255,9 @@ else
     echo "         详见 $(ag2a_data_dir)/run.log"
     notify "网关重启失败 · 端口 $PORT 没监听，详见 run.log"
 fi
+# 说明行必须在这里再刷一次：service.sh restart 内部那次刷在等待端口之后，
+# APatch 执行 action 有超时，来不及跑到那里就把整个进程带走了 ⇒ 列表里时间不变。
+sh "$MODDIR/refresh.sh" quiet >/dev/null 2>&1
 echo "面板     http://${WL:-127.0.0.1}:$PORT/"
 echo "运行体   $(ag2a_bin)"
 echo "自动更新 $(auto_status)"

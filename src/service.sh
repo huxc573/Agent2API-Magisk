@@ -182,6 +182,9 @@ if [ "$1" != "restart" ] && [ "$1" != "run" ] && [ -n "$(ag2a_pids)" ]; then
         start | "") start_watchdog; start_update_timer ;;
         crontab)    stop_update_timer; start_update_timer ;;
     esac
+    # ⚠ 这里也要刷：开机时进本分支（网关已由看门狗拉起）如果不刷，说明行就永远停在
+    #    上一次写的内容 —— 看起来就是「重启手机后 IP:端口/时间没刷新」。
+    sh "$MODDIR/refresh.sh" quiet >/dev/null 2>&1
     exit 0
 fi
 
@@ -270,5 +273,9 @@ if [ -n "$AG2A_ADMIN_PASSWORD" ] && [ ! -f "$WORK/admin.json" ]; then
     ( sleep 3
       ag2a_seed_admin "$PORT_FORCED" >/dev/null 2>&1 && rm -f "$WORK/admin_pw" ) &
 fi
+# 网关起来 3 秒后刷一次说明行：exec 之后本进程就是网关，只能靠后台子 shell。
+# 这样「点执行 / 看门狗重拉 / 开机启动」三条路径都不依赖外层 service.sh 有没有跑到最后
+# （APatch 执行 action 有超时，外层等待+自检可能来不及刷）。
+( sleep 3; sh "$MODDIR/refresh.sh" quiet ) >/dev/null 2>&1 &
 # shellcheck disable=SC2086
 exec $(ag2a_cmdline)

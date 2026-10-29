@@ -1,23 +1,37 @@
 #!/bin/sh
 # 在 arm64 镜像里跑（qemu 模拟），把模块需要的运行体拷到挂进来的 /out。
 # 只做「原样搬运」：不编译、不改二进制。
+#
+# /out/usr/local/bin/agent2api-server 与 /out/app/ui 可能已由 rootfs.sh 从
+# 上游 Release 资产放好（那是与 tag 一一对应、且过了 sha256 校验的版本），
+# 此时镜像只负责补 so / 根证书 / 时区，不能覆盖它们。
 set -eu
 
-BIN=/usr/local/bin/agent2api-server
-[ -f "$BIN" ] || BIN=$(command -v agent2api-server)
-[ -n "$BIN" ] && [ -f "$BIN" ] || { echo "镜像里找不到 agent2api-server"; exit 1; }
+if [ -f /out/usr/local/bin/agent2api-server ]; then
+    BIN=/out/usr/local/bin/agent2api-server
+    echo "bin: 已由上游 Release 资产提供（$(wc -c < "$BIN") 字节），镜像不覆盖"
+else
+    BIN=/usr/local/bin/agent2api-server
+    [ -f "$BIN" ] || BIN=$(command -v agent2api-server)
+    [ -n "$BIN" ] && [ -f "$BIN" ] || { echo "镜像里找不到 agent2api-server"; exit 1; }
+    mkdir -p /out/usr/local/bin
+    cp -f "$BIN" /out/usr/local/bin/agent2api-server
+    echo "bin: $(wc -c < "$BIN") 字节（来自镜像）"
+fi
 
-mkdir -p /out/usr/local/bin /out/lib /out/etc /out/usr/share/zoneinfo/Asia /out/app
-cp -f "$BIN" /out/usr/local/bin/agent2api-server
-echo "bin: $(wc -c < "$BIN") 字节"
+mkdir -p /out/lib /out/etc /out/usr/share/zoneinfo/Asia /out/app
 
-UI=""
-for d in /app/ui /ui /opt/agent2api/ui /srv/ui; do
-    [ -d "$d" ] && { UI="$d"; break; }
-done
-[ -n "$UI" ] || { echo "镜像里找不到 panel ui 目录"; exit 1; }
-cp -a "$UI" /out/app/ui
-echo "ui: $(find /out/app/ui -type f | wc -l) 个文件（来自 $UI）"
+if [ -d /out/app/ui ]; then
+    echo "ui: 已由上游 Release 资产提供（$(find /out/app/ui -type f | wc -l) 个文件）"
+else
+    UI=""
+    for d in /app/ui /ui /opt/agent2api/ui /srv/ui; do
+        [ -d "$d" ] && { UI="$d"; break; }
+    done
+    [ -n "$UI" ] || { echo "镜像里找不到 panel ui 目录"; exit 1; }
+    cp -a "$UI" /out/app/ui
+    echo "ui: $(find /out/app/ui -type f | wc -l) 个文件（来自 $UI）"
+fi
 
 cp -f /etc/ssl/certs/ca-certificates.crt /out/etc/ca-certificates.crt
 cp -f /usr/share/zoneinfo/Asia/Shanghai /out/usr/share/zoneinfo/Asia/Shanghai

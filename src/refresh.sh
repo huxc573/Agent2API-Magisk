@@ -44,7 +44,14 @@ PORT=$(ag2a_get_port)
 ST="$ST · $IP:$PORT"
 # 点「执行」重启后管理器会**自己退回列表**（APatch 的 ExecuteAPMActionScreen 成功即
 # popBackStack，脚本控制不了），所以结果只能看这一行：把启动时刻写进来，时间变了就是重启成功。
-[ -n "$_run" ] && ST="$ST · $(date '+%H:%M') 启动"
+# ⚠ 时刻取**网关进程自己的启动时间**（date -r /proc/<pid>），不是「本次刷新的时间」：
+#   刷新可能被延后、重复执行，取刷新时刻会让「没重启」也显示成刚启动。
+[ -n "$_run" ] && {
+    _gp=$(ag2a_pids | head -n1)
+    _t0=$(date -r "/proc/$_gp" '+%m-%d %H:%M' 2>/dev/null)
+    [ -n "$_t0" ] || _t0=$(date '+%m-%d %H:%M')
+    ST="$ST · $_t0 启动"
+}
 case "$ST" in
     *停用* | *缺少*) : ;;
     *) ST="$ST ｜ 执行=重启进程" ;;
