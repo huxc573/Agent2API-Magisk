@@ -108,18 +108,22 @@ jobs:
           # 资产直链走 gh-proxy 镜像：国内直连 github.com/releases/download 基本拉不动，
           # 管理器点了「更新」也下不下来。要直连的话把 GH_PROXY 置空即可。
           GH_PROXY="https://gh-proxy.com/"
+          # changelog 必须是**纯文本**直链：早先指向 github.com/…/blob/… 的网页，
+          # 管理器原样把整页 HTML（字符集 meta、<link> 一堆）当日志显示，没法看。
+          # 这里另存一份只有本次更新说明的 changelog.md，走 raw + 镜像。
+          cp notes.md changelog.md
           cat > update.json <<EOF
           {
             "version": "$ver",
             "versionCode": $vc,
             "zipUrl": "${GH_PROXY}${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/v${V}/$(basename "$zip")",
-            "changelog": "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md"
+            "changelog": "${GH_PROXY}https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/changelog.md"
           }
           EOF
           echo "$UP" > UPSTREAM
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add UPSTREAM update.json
+          git add UPSTREAM update.json changelog.md
           # 上游没变时（force 出包）UPSTREAM 可能没 diff，但 update.json 一定变了；
           # 两个都没变才跳过，别让 git commit 以 1 退出
           if git diff --cached --quiet; then

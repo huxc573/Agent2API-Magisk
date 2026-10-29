@@ -5,9 +5,14 @@
 
 ---
 
-## 26.10.29_8（当前）
+## 26.10.30_3（当前）
 
-- **钉回上游 `3.3.0-beta.4`**：beta.5 的 headless 启动是坏的 —— 二进制在 `server/src/server/core/update/mod.rs:518` 里 `tokio::spawn`，而这一段跑在还没有 Tokio 运行时的主线程上，进程启动即 `panic: there is no reactor running`、`rc=134`，看门狗反复重拉也起不来（上游 issue #391，官方答复是升 `3.3.0-beta.5.1`，但截至本包只有 tag、没有 release 资产）。上游 `main` 已把 `init_global` 里的 spawn 删掉，模块侧改不了二进制，只能钉版等它发新包。
+- **运行体改钉 `3.3.0-beta.5.1`**：`3.3.0-beta.5.1` 的官方镜像已经推出来了（Docker Hub 有这个 tag），里面就是修掉启动 panic 的版本；`26.10.30_1` 临时用的 beta.4 作废。
+- **修管理器的「更新日志」显示成一坨 HTML**：`update.json` 的 `changelog` 之前指向 `github.com/…/blob/main/CHANGELOG.md`（网页），管理器把整页 HTML 当文本抓下来显示。现在 CI 另存一份只含本次说明的 `changelog.md`，`changelog` 指向它的 raw 直链（走 gh-proxy 镜像）。
+
+## 26.10.30_1
+
+- **钉回上游 `3.3.0-beta.4`**：beta.5 的 headless 启动是坏的 —— 二进制在 `server/src/server/core/update/mod.rs:518` 里 `tokio::spawn`，而这一段跑在还没有 Tokio 运行时的主线程上，进程启动即 `panic: there is no reactor running`、`rc=134`，看门狗反复重拉也起不来（上游 issue #391；当时 beta.5.1 只有 tag、没 release 包，随后镜像才推出来）。上游 `main` 已把 `init_global` 里的 spawn 删掉，模块侧改不了二进制，只能钉版等它发新包。
 - 新增 `UPSTREAM_PIN`：仓库根这个文件非空时，每小时轮询与手动触发的 tag 都只认它，避免自动把坏版本再推上来；上游发了可用的新版就删掉它恢复跟随。
 - ⚠`_7` 里那条「证书/时区 env 没 export」是真 bug，但不是这次起不来的原因。
 
