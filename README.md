@@ -9,7 +9,7 @@
 > **上游与致谢**：服务本体、panel UI、官方插件全部来自
 > [aimod-cc/agent2api](https://github.com/aimod-cc/agent2api)（**MIT**，镜像 `aimodcc/agent2api`）。
 > 本项目只做「把它装进 Android」这层壳——挂载逻辑、启动/看门狗、插件启动壳、WebUI 入口页、打包与 CI。
-> Release 里的运行体由 CI 从官方镜像原样抽取，未改二进制。详见 [THIRD-PARTY.md](THIRD-PARTY.md)。
+> Release 里的运行体由 CI 原样取自上游（优先用上游 Release 资产并校验其 `.sha256`，没有资产才从官方镜像 `aimodcc/agent2api` 抽），未改二进制。详见 [THIRD-PARTY.md](THIRD-PARTY.md)。
 
 ## 安装
 
@@ -138,7 +138,7 @@ su -c "sh $M/updater.sh now"                   # 立刻查一次
 | 路径 | 说明 |
 |---|---|
 | `src/` | 脚本壳（`module.prop`、`*.sh`、`webroot/`） |
-| `rootfs/` | 运行体，**不入库**，由 `scripts/ci/rootfs.sh` 从镜像抽取 |
+| `rootfs/` | 运行体，**不入库**，由 `scripts/ci/rootfs.sh` 抽取（先试上游 Release 资产，缺了才走镜像） |
 | `build_module.py` | 组装 zip：注入仓库地址、映射目录、校验 ELF 必须 aarch64、统一 LF、脚本 0755 |
 | `update.json` | 管理器更新源（CI 每次出包后重写并提交） |
 | `.github/workflows/build.yml` | 每小时查上游（cron `30 * * * *`），有新版就出包并发 **pre-release**（不占 Latest） |
@@ -149,7 +149,7 @@ su -c "sh $M/updater.sh now"                   # 立刻查一次
 
 ```bash
 python build_module.py 26.10.26_1     # → publish/Agent2API-Magisk-v26.10.26_1.zip
-scripts/ci/rootfs.sh 3.3.0-beta.4     # 本地抽运行体（需要 docker）
+scripts/ci/rootfs.sh 3.3.0-beta.4     # 本地抽运行体（需要 docker + gh 登录）
 ```
 
 ## 许可
