@@ -26,6 +26,10 @@
        font:inherit;font-weight:600;text-align:center;text-decoration:none;cursor:pointer}
   a.b{background:var(--btn);color:#fff}
   button.b{background:var(--btn2);color:var(--fg)}
+  .btnrow{display:flex;gap:10px;margin:0 0 10px}
+  .btnrow>button{flex:1;margin:0;padding:13px 6px;font-size:14px}
+  .btnrow>button.danger{color:var(--warn)}
+  button.b[disabled]{opacity:.55;cursor:default}
   pre.log{margin:6px 0 0;padding:8px 10px;border-radius:9px;background:var(--btn2);color:var(--dim);
           font:11.5px/1.55 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;
           max-height:168px;overflow:auto}
@@ -48,6 +52,10 @@
   </div>
 
   <a class="b" id="go" href="#">打开面板</a>
+  <div class="btnrow">
+    <button class="b" id="restart" type="button">重启进程</button>
+    <button class="b danger" id="stop" type="button">停止进程</button>
+  </div>
   <button class="b" id="br" type="button">用浏览器打开</button>
   <button class="b" id="rel" type="button">打开 GitHub 更新地址</button>
 
@@ -81,9 +89,11 @@
   // 仓库地址由 build_module.py 按 $AG2A_SELF_REPO 注入（CI 传 ${{ github.repository }}）
   var REPO = '__AG2A_REPO__';
   var REL = 'https://github.com/' + REPO + '/releases';
-  // 走 gh-proxy 镜像：国内直连 raw.githubusercontent.com 基本不通；不通再退回直连试一次
-  var UPD = ['https://gh-proxy.com/https://raw.githubusercontent.com/' + REPO + '/main/update.json',
-             'https://raw.githubusercontent.com/' + REPO + '/main/update.json'];
+  // 更新源与 module.prop 的 updateJson 保持一致：优先 GitHub Pages（直连 1~2 秒），
+  // 万一 Pages 没部署好再试 gh-proxy + raw（多一跳，慢且可能被判超时）。
+  var PAGES = '__AG2A_PAGES__';
+  var UPD = ['https://' + PAGES + '/update.json',
+             'https://gh-proxy.com/https://raw.githubusercontent.com/' + REPO + '/main/update.json'];
 
   // ---------- 端口 ----------
   var PORT = 3065, raw = sh('cat /data/adb/ag2a/port');
@@ -94,24 +104,30 @@
   document.getElementById('go').href = url;
 
   // ---------- 模块版本 / 运行体 / 进程 ----------
-  var mver = (sh("sed -n 's/^version=//p' /data/adb/modules/ag2a/module.prop") || '').trim();
-  var mcode = digits(sh("sed -n 's/^versionCode=//p' /data/adb/modules/ag2a/module.prop"));
-  var rcode = digits(sh('cat /data/adb/ag2a/rt/.rtver'));
-  document.getElementById('ver').textContent = mver || '读取不到';
+  // 抽成函数：点「重启进程 / 停止进程」之后要重新读一遍，不然面板还显示旧状态。
+  var MOD = '/data/adb/modules/ag2a';
+  var mver = '', mcode = '', cur = '';
+  function refreshState() {
+    mver = (sh("sed -n 's/^version=//p' " + MOD + '/module.prop') || '').trim();
+    mcode = digits(sh("sed -n 's/^versionCode=//p' " + MOD + '/module.prop'));
+    var rcode = digits(sh('cat /data/adb/ag2a/rt/.rtver'));
+    cur = mver.split(' ')[0] || '';
+    document.getElementById('ver').textContent = mver || '读取不到';
 
-  var pid = digits(sh('pidof agent2api-server')) || digits(sh('pgrep -f agent2api-server'));
-  document.getElementById('state').innerHTML = pid
-    ? '<span class="ok">运行中</span> <span class="dim">pid ' + pid + '</span>'
-    : '<span class="warn">未运行</span> <span class="dim">— 看下面的日志，回上一页点「执行」重启</span>';
+    var pid = digits(sh('pidof agent2api-server')) || digits(sh('pgrep -f agent2api-server'));
+    document.getElementById('state').innerHTML = pid
+      ? '<span class="ok">运行中</span> <span class="dim">pid ' + pid + '</span>'
+      : '<span class="warn">未运行</span> <span class="dim">— 看下面的日志；点上面「重启进程」或回上一页点「执行」</span>';
 
-  if (mcode && rcode && mcode !== rcode) {
-    document.getElementById('rt').textContent = '· 运行体未同步（点「执行」或重启）';
+    document.getElementById('rt').textContent =
+      (mcode && rcode && mcode !== rcode) ? '· 运行体未同步（点「执行」或重启）' : '';
+    readLog();
   }
+  refreshState();
 
   // ---------- 更新检查 ----------
   // 读仓库里的 update.json —— 与管理器里「更新」按钮同一个数据源，比对 versionCode
   var upd = document.getElementById('upd');
-  var cur = (mver.split(' ')[0] || '');
   function probe(i) {
     if (i >= UPD.length) {
       upd.innerHTML = '<span class="dim">网络不通，点下面 Releases 自己看</span>';
@@ -140,14 +156,42 @@
   function openUrl(u) {
     if (sh('am start -a android.intent.action.VIEW -d ' + u) === null) window.open(u, '_blank');
   }
+
+  // 重启 / 停止：直接调模块自带脚本。restart 会等到端口真的 LISTEN 才返回（最长约 15 秒），
+  // 面板是同步执行，所以先把按钮置灰让用户看到「正在…」，再执行。
+  function runJob(btn, busyText, cmd) {
+    var old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = busyText;
+    setTimeout(function () {
+      var out = sh(cmd);
+      setTimeout(function () {
+        btn.disabled = false;
+        btn.textContent = old;
+        refreshState();
+        if (out === null) {
+          document.getElementById('tip').innerHTML =
+            '<span class="warn">没拿到命令返回：管理器没注入 shell 时无法操作，</span>' +
+            '请在终端跑 <code>su -c \'sh ' + MOD + '/action.sh restart\'</code>。';
+        }
+      }, 300);
+    }, 60);
+  }
+  document.getElementById('restart').addEventListener('click', function () {
+    runJob(this, '重启中…', 'sh ' + MOD + '/action.sh restart');
+  });
+  document.getElementById('stop').addEventListener('click', function () {
+    if (!window.confirm('停止网关进程？停止后面板地址会打不开，需要再点「重启进程」恢复。')) return;
+    runJob(this, '停止中…', 'sh ' + MOD + '/action.sh stop');
+  });
   document.getElementById('br').addEventListener('click', function () { openUrl(url); });
   document.getElementById('rel').addEventListener('click', function () { openUrl(REL); });
 
   // ---------- 日志 ----------
   // 起不来时唯一有信息量的地方：watchdog 把网关的 stdout/stderr 直接写进 run.log。
   // 过滤掉 [watchdog] 那几句「重拉中」，只留网关自己的报错。
-  var lg = document.getElementById('log');
   function readLog() {
+    var lg = document.getElementById('log');
     var t = sh('tail -n 40 /data/adb/ag2a/run.log');
     if (t == null) { lg.textContent = '读不到日志（管理器没注入 shell 时正常）'; return; }
     var lines = String(t).split('\n').filter(function (l) {
