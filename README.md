@@ -13,7 +13,7 @@
 
 ## 安装
 
-1. 从 [Releases](../../releases) 下最上面那个 zip（**全部以 pre-release 发布**，页面没有 Latest，按时间倒序取第一行），在管理器里刷入；
+1. 从 [Releases](../../releases) 下最上面那个 zip（**预发/正式跟随上游**：上游还是 beta 时我们发 Pre-release，上游转正就是正式版；不想分辨就按时间倒序取第一行），在管理器里刷入；
 2. 按音量键答两题（音量下＝下一项，音量上＝确认）——端口（3065 ↔ 52018，首项是当前值）、自动更新（开/关，首次默认关）；
    已装过的机器会**先多问一题**「是否重新设置」，音量上直接确认＝配置一个字都不动；
 3. **首次安装要重启手机**：刷 zip 只解到 `modules_update/`，模块目录要重启才整体替换，安装器会提示「首次安装，重启设备后自动运行」。
@@ -48,7 +48,7 @@ updateJson=https://huxc573.github.io/Agent2API-Magisk/update.json
   "changelog": "https://huxc573.github.io/Agent2API-Magisk/CHANGELOG.md" }
 ```
 
-Magisk / KernelSU / APatch 都会读这行，拿 `update.json` 的 `versionCode` 和本机的比，**大于本机就在模块列表里显示「更新」**，点一下直接下 `zipUrl` 刷入。每次 CI 出包后按打好的 zip 自动重写这个文件并提交，所以它永远指向最新那个包——这也是为什么包全是 pre-release 也不影响管理器更新（管理器不看 Release 的「Latest」，只看这个 JSON）。
+Magisk / KernelSU / APatch 都会读这行，拿 `update.json` 的 `versionCode` 和本机的比，**大于本机就在模块列表里显示「更新」**，点一下直接下 `zipUrl` 刷入。每次 CI 出包后按打好的 zip 自动重写这个文件并提交，所以它永远指向最新那个包——所以不管发的是 Pre-release 还是正式版，管理器更新都一样能用（它不看 Release 的「Latest」，只看这个 JSON）。
 
 - ⚠ `zipUrl` 套了 `gh-proxy.com` 镜像：实测国内直连 `raw.githubusercontent.com` 和 `github.com/…/releases/download/…` 都是超时（000）。镜像挂了就改一行 URL 重新出包，或者直接去 Releases 页手动刷。
 - `updateJson` 与 `changelog` 都走 **GitHub Pages**（源＝main 根目录），不能指向 `github.com/…/blob/…` 网页（管理器抓到整页 HTML，日志里显示一堆 `<meta>` / `<link>`），也不要套 `gh-proxy` 中转（多一跳会被判超时，拉不到就等于「永远没更新」）。
@@ -141,7 +141,7 @@ su -c "sh $M/updater.sh now"                   # 立刻查一次
 | `rootfs/` | 运行体，**不入库**，由 `scripts/ci/rootfs.sh` 抽取（先试上游 Release 资产，缺了才走镜像） |
 | `build_module.py` | 组装 zip：注入仓库地址、映射目录、校验 ELF 必须 aarch64、统一 LF、脚本 0755 |
 | `update.json` | 管理器更新源（CI 每次出包后重写并提交） |
-| `.github/workflows/build.yml` | 每小时查上游（cron `30 * * * *`），有新版就出包并发 **pre-release**（不占 Latest） |
+| `.github/workflows/build.yml` | 每小时查上游（cron `30 * * * *`），有新版就出包；发正式版还是 Pre-release 跟随上游那个 release 的 pre 标记 |
 
 上游一发版，下一轮定时就会出包；想立刻出包不用等，在 Actions 里手动跑 `build`（勾 `force` 可强制出）。
 

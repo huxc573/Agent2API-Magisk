@@ -78,15 +78,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           V: ${{ steps.ver.outputs.version }}
           UP: ${{ steps.up.outputs.tag }}
+          PRE: ${{ steps.up.outputs.prerelease }}
         run: |
           set -euo pipefail
           zip="publish/Agent2API-Magisk-v${V}.zip"
           # 说明里直接写「本模块改了什么 + 上游这版改了什么」：上游常常只有 tag 不发 Release，
           # 甚至事后删 tag，只放链接的话点开就是 404，谁也看不出更新了啥。
           bash scripts/ci/notes.sh "$V" "$UP" "$zip" "${{ steps.rt.outputs.src }}" "${{ steps.rt.outputs.image }}" "${{ steps.rt.outputs.bin_sha256 }}"
-          # 上游长期只有 beta/rc，我们不宣称「稳定版」：所有包一律 pre-release，
-          # 因此不会占用 Latest（Latest 永为空，用户按 Release 页的日期取最新）。
-          gh release create "v$V" "$zip" --title "$V" --notes-file notes.md --prerelease
+          # 预发/正式跟随上游那个 release：上游是 beta 我们就标 Pre-release，
+          # 上游转正（如 3.4.0）我们也发正式版，正式版才会占用 Latest。
+          # 查不到上游标记时 upstream.sh 兜底给 prerelease=1，宁可不转正。
+          if [ "${PRE:-1}" = "0" ]; then
+              echo "上游已是正式版 → 本包按正式版发"
+              gh release create "v$V" "$zip" --title "$V" --notes-file notes.md
+          else
+              echo "上游是预览版 → 本包按 Pre-release 发"
+              gh release create "v$V" "$zip" --title "$V" --notes-file notes.md --prerelease
+          fi
 
       - name: 写 update.json + 记账（UPSTREAM）
         if: steps.up.outputs.skip != '1'

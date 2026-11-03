@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# 解析上游最新 tag。输出到 $GITHUB_OUTPUT：tag=<tag>  skip=<0|1>
+# 解析上游最新 tag。输出到 $GITHUB_OUTPUT：tag=<tag>  prerelease=<0|1>  skip=<0|1>
 #   skip=1 表示和仓库里 UPSTREAM 记录的一致（没有新版），除非 FORCE=1。
+#   prerelease 跟随上游那个 release 的 pre 标记：上游发正式版，我们的包也是正式版。
 set -euo pipefail
 
 IN="${1:-}"
@@ -29,11 +30,24 @@ fi
 [ -n "$TAG" ] || { echo "::error::两个仓库都拿不到上游 release"; exit 1; }
 TAG="${TAG#v}"
 
+# 上游该 release 是不是预览版。查不到（只有 tag 没 release、或没网络）就**当预览版**：
+# 宁可少一次「转正」，也别把没验证过的包标成正式版。
+PRE="1"
+for r in "${REPOS[@]}"; do
+    p=$(gh api "repos/$r/releases/tags/v$TAG" --jq '.prerelease' 2>/dev/null || true)
+    if [ "$p" = "true" ] || [ "$p" = "false" ]; then
+        PRE="$([ "$p" = "true" ] && echo 1 || echo 0)"
+        echo "上游 v$TAG 的 prerelease=$p（$r）"
+        break
+    fi
+done
+
 CUR="$(cat UPSTREAM 2>/dev/null | tr -d ' \r\n' || true)"
-echo "上游 tag: $TAG（仓库记录: ${CUR:-空}）"
+echo "上游 tag: $TAG（仓库记录: ${CUR:-空}），本包 prerelease=$PRE"
 
 {
     echo "tag=$TAG"
+    echo "prerelease=$PRE"
     if [ "$TAG" = "$CUR" ] && [ "${FORCE:-0}" != "1" ]; then
         echo "skip=1"
     else
