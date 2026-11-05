@@ -32,8 +32,8 @@
 - 「打开」依赖管理器的模块 WebUI：APatch（≥10568）、KernelSU 及各分支原生支持；Magisk 上游没有 WebView，装 KsuWebUI 或 MMRL 才会出现。没有也不影响，`sh action.sh open` 用系统浏览器打开。
 - 面板里的「更新」一栏读的是仓库的 `update.json`（跟管理器自己弹的更新提示同一个数据源）；网络不通就只显示「查不到」，点下面的按钮自己看。
 - 起不来先看「打开」页最下面的**日志**块（`/data/adb/ag2a/run.log` 尾部，已滤掉看门狗的「重拉中」）：网关自己的报错都在那儿。
-- ⚠ 这两个按钮的行为由模块目录里的脚本决定，**刷完要重启一次**才换成新版（服务本身不受影响）。
-- ⚠ 点「执行」成功后管理器会自己退回列表（APatch `ExecuteAPMActionScreen` 里的 `popBackStack()`，脚本控制不了）。结果看通知，或看模块说明行：`运行中 · IP:端口 · 23:25 启动 ｜ 执行=重启进程`。
+- 这两个按钮的行为由模块目录里的脚本决定，**刷完要重启一次**才换成新版（网关服务本身不受影响）。
+- 点「执行」成功后管理器会自己退回模块列表（APatch `ExecuteAPMActionScreen` 的 `popBackStack()`）。结果看通知，或看模块说明行：`运行中 · IP:端口 · 23:25 启动 ｜ 执行=重启进程`。
 
 ## 管理器里的更新提示
 
@@ -51,11 +51,9 @@ updateJson=https://huxc573.github.io/Agent2API-Magisk/update.json
 
 Magisk / KernelSU / APatch 都会读这行，拿 `update.json` 的 `versionCode` 和本机的比，**大于本机就在模块列表里显示「更新」**，点一下直接下 `zipUrl` 刷入。每次 CI 出包后按打好的 zip 自动重写这个文件并提交，所以它永远指向最新那个包——所以不管发的是 Pre-release 还是正式版，管理器更新都一样能用（它不看 Release 的「Latest」，只看这个 JSON）。
 
-- ⚠ `zipUrl` 套了 `gh-proxy.com` 镜像：实测国内直连 `raw.githubusercontent.com` 和 `github.com/…/releases/download/…` 都是超时（000）。镜像挂了就改一行 URL 重新出包，或者直接去 Releases 页手动刷。
-- `updateJson` 与 `changelog` 都走 **GitHub Pages**（源＝main 根目录），不能指向 `github.com/…/blob/…` 网页（管理器抓到整页 HTML，日志里显示一堆 `<meta>` / `<link>`），也不要套 `gh-proxy` 中转（多一跳会被判超时，拉不到就等于「永远没更新」）。
-- `changelog` 指向 `changelog.txt`，**只含本次这一版**的说明（CI 由 `scripts/ci/notes.sh` 生成：本模块改动 + `【上游 x.y.z】` 上游这一版的更新内容，有的话）。别改回整份 `CHANGELOG.md`：管理器那个框是逐行滚的纯文本，几百行历史塞进去既难读，也容易把不该给用户看的过程描述带出去。
-- 该文件同时挂进对应 Release 当 asset：上游没变、只是本模块内容变了而 force 重出包时，直接沿用上一版那份，不会取错小节。
-- ⚠ 装的是**旧版（没有 updateJson 的那几版）**的，要手动刷一次新版，之后才会有提示。
+- `zipUrl` 走 `gh-proxy.com` 镜像（国内直连 `github.com/…/releases/download/…` 超时）。镜像不可用时，直接到 [Releases](../../releases) 手动下载刷入。
+- 装的是**没有 `updateJson` 的旧版**时，需手动刷一次本版，之后才会出现更新提示。
+- 维护相关（`updateJson` / `changelog` 为什么走 Pages、`changelog.txt` 怎么生成）写在与改仓库的人有关的文件里，见 `scripts/ci/notes.sh` 顶部注释与 `.github/workflows/build.yml` 的同段注释。
 
 ## 常用命令
 
@@ -126,7 +124,7 @@ su -c "sh $M/action.sh auto channel beta|stable"
 su -c "sh $M/updater.sh now"                   # 立刻查一次
 ```
 
-- ⚠ 不能用 `/releases/latest`：上游正式版最高只到 **v3.0.8**（v3.0.9 之后全是 beta），latest 永远返回它 ⇒ 只能按 tag 列表挑。
+- 不用 `/releases/latest`：上游正式版最高只到 **v3.0.8**（其后全是 beta），latest 永远返回它 ⇒ 按 tag 列表挑。
 - 资产下载走多源：`gh-proxy.com → ghproxy.net → ghfast.top → GitHub 直连`，每个源都用 API 给的 digest 校验。
 - 定时器是「睡到点才醒」的进程，不是轮询；关掉时它根本不启动。
 
