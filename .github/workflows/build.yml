@@ -110,10 +110,20 @@ jobs:
           # 管理器（Magisk / KernelSU / APatch）靠 module.prop 的 updateJson 拉这个文件，
           # 比较其中的 versionCode 决定是否显示「更新」。所以两者必须永远指向同一个 zip。
           # version / versionCode 直接从打好的包里读，杜绝手抄错位。
-          ver=$(unzip -p "$zip" module.prop | sed -n 's/^version=//p' | cut -d' ' -f1)
-          vc=$(unzip -p "$zip" module.prop | sed -n 's/^versionCode=//p')
-          # 资产直链走 gh-proxy 镜像：国内直连 github.com/releases/download 基本拉不动，
-          # 管理器点了「更新」也下不下来。要直连的话把 GH_PROXY 置空即可。
+          # ⚠ 必须洗成「纯数字 / 单行」：Magisk 用 moshi 严格反序列化
+          # （ModuleJson 的 version/versionCode/zipUrl/changelog 全是非空必填），
+          # 多一个 \r 或空格就是非法 JSON，整条更新信息被丢弃 → 管理器永远不显示更新。
+          ver=$(unzip -p "$zip" module.prop | sed -n 's/^version=//p' | cut -d' ' -f1 | tr -d ' \r\n')
+          vc=$(unzip -p "$zip" module.prop | sed -n 's/^versionCode=//p' | tr -cd '0-9')
+          case "$vc" in
+            ''|*[!0-9]*) echo "versionCode 非法（$vc），中止" >&2; exit 1 ;;
+          esac
+          case "$ver" in
+            '') echo "version 为空，中止" >&2; exit 1 ;;
+          esac
+          echo "update.json 将写入 version=$ver versionCode=$vc"
+          # 资产直链走 gh-proxy 镜像：国内直连 github.com/releases/download 实测 15s 超时（000），
+          # 经镜像 2.5s 拿到 200。管理器点了「更新」才下得动。
           GH_PROXY="https://gh-proxy.com/"
           # changelog 必须是**纯文本**直链：指向 github.com/…/blob/… 时管理器抓到的是整页
           # HTML（字符集 meta、<link> 一堆），显示成一坨乱码。
