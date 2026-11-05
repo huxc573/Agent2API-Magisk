@@ -45,13 +45,14 @@ updateJson=https://huxc573.github.io/Agent2API-Magisk/update.json
 ```json
 { "version": "26.10.30_5", "versionCode": 26103005,
   "zipUrl": "https://gh-proxy.com/https://github.com/…/releases/download/v26.10.30_5/…zip",
-  "changelog": "https://huxc573.github.io/Agent2API-Magisk/CHANGELOG.md" }
+  "changelog": "https://huxc573.github.io/Agent2API-Magisk/changelog.txt" }
 ```
 
 Magisk / KernelSU / APatch 都会读这行，拿 `update.json` 的 `versionCode` 和本机的比，**大于本机就在模块列表里显示「更新」**，点一下直接下 `zipUrl` 刷入。每次 CI 出包后按打好的 zip 自动重写这个文件并提交，所以它永远指向最新那个包——所以不管发的是 Pre-release 还是正式版，管理器更新都一样能用（它不看 Release 的「Latest」，只看这个 JSON）。
 
 - ⚠ `zipUrl` 套了 `gh-proxy.com` 镜像：实测国内直连 `raw.githubusercontent.com` 和 `github.com/…/releases/download/…` 都是超时（000）。镜像挂了就改一行 URL 重新出包，或者直接去 Releases 页手动刷。
 - `updateJson` 与 `changelog` 都走 **GitHub Pages**（源＝main 根目录），不能指向 `github.com/…/blob/…` 网页（管理器抓到整页 HTML，日志里显示一堆 `<meta>` / `<link>`），也不要套 `gh-proxy` 中转（多一跳会被判超时，拉不到就等于「永远没更新」）。
+- `changelog` 指向 `changelog.txt`，**只含本次这一版**的说明（CI 从 `CHANGELOG.md` 最新小节自动裁出来）。别改回整份 `CHANGELOG.md`：管理器那个框是逐行滚的纯文本，几百行历史塞进去既难读，也容易把不该给用户看的过程描述带出去。
 - ⚠ 装的是**旧版（没有 updateJson 的那几版）**的，要手动刷一次新版，之后才会有提示。
 
 ## 常用命令
