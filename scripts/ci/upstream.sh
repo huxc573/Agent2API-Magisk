@@ -64,4 +64,8 @@ fi
     echo "prerelease=$PRE"
     echo "finger=$FINGER"
     echo "skip=$SKIP"
+    # notes.sh 打包时会计入 scripts/ci/*.sh 的指纹，所以它必须在这里先落盘再取，
+    # 否则「只改 notes.sh」会重出包却仍沿用旧的 changelog.txt。
+    echo "lastv=$LASTV"
+    echo "lastf=$LASTF"
 } >> "${GITHUB_OUTPUT:?GITHUB_OUTPUT 未设置}"

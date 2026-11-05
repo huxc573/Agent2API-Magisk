@@ -41,7 +41,7 @@ else
         UP_LINK="https://github.com/$UPREPO/commits"
     fi
 fi
-UP_BODY="$(printf '%s' "$UP_BODY" | head -c 1500 || true)"
+UP_BODY="$(printf '%s' "$UP_BODY" | head -c 4000 || true)"
 [ -n "$UP_BODY" ] || UP_BODY="（上游没有可读的 release 说明或提交信息）"
 
 # ---- 运行体来源 ----
@@ -72,6 +72,31 @@ $UP_BODY
 
 在管理器里刷入 zip（APatch / Magisk / KernelSU）。**首次安装要重启一次**，升级安装刷完即生效。
 升级时运行体在 \`/data/adb/ag2a/rt/\` 立即换新；两个按钮（打开/执行）的面板入口需重启一次才换成新版。
+
+刷入时可以用音量键选项；**5 秒内不按键就按默认项继续**，不会卡住。
 EOF
 
-echo "notes.md 已生成（$(wc -l < notes.md) 行）"
+# ---- 管理器更新日志（changelog.txt）：本模块改动 + 上游改动 ----
+# 管理器那个框是纯文本、逐行滚的，所以这里只留要点，不带 markdown 语法与内部过程。
+# 上游那一段很重要：用户点「更新」时最想知道的就是「上游这次修了什么」。
+{
+    printf '%s\n' "$LOCAL" | sed 's/\*\*//g' | sed 's/`//g' | sed 's/^[[:space:]]*//' | sed '/^$/d'
+    if [ -n "$UP_BODY" ] && [ "$UP_BODY" != "（上游没有可读的 release 说明或提交信息）" ]; then
+        printf '\n【上游 %s】\n' "$UP"
+        printf '%s\n' "$UP_BODY" \
+            | sed 's/\*\*//g' | sed 's/`//g' \
+            | sed 's/^[[:space:]]*[-*][[:space:]]*//' \
+            | sed 's/[[:space:]]*$//' \
+            | sed '/^$/d' \
+            | awk 'BEGIN{n=0} {n++; if(n>16){exit} print}'
+        # 上游说明常常比 16 行还长，截断处留一句「去 Releases 看全」，
+        # 否则用户以为上游就改了这些。
+        _up_lines=$(printf '%s\n' "$UP_BODY" | sed '/^[[:space:]]*$/d' | wc -l)
+        if [ "$_up_lines" -gt 16 ]; then
+            printf '…（共 %s 条，完整说明见 Releases 页）\n' "$_up_lines"
+        fi
+    fi
+    printf '\n（上游运行体 %s）\n' "$UP"
+} > changelog.txt
+
+echo "notes.md 已生成（$(wc -l < notes.md) 行）；changelog.txt $(wc -l < changelog.txt) 行"

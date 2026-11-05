@@ -95,6 +95,9 @@ jobs:
               echo "上游是预览版 → 本包按 Pre-release 发"
               gh release create "v$V" "$zip" --title "$V" --notes-file notes.md --prerelease
           fi
+          # 顺带把这一版的 changelog.txt 挂成 asset：上游没变、只改内容而重出包时，
+          # 后面那步要把它逐字沿用，不能靠「重新生成」（重新生成会按当前 CHANGELOG 取错小节）。
+          gh release upload "v$V" changelog.txt --clobber
 
       - name: 写 update.json + 记账（UPSTREAM）
         if: steps.up.outputs.skip != '1'
@@ -124,6 +127,19 @@ jobs:
           awk 'BEGIN{n=0} /^## /{n++; if(n==2) exit} n==1' CHANGELOG.md \
             | sed '1d' | sed 's/^[[:space:]]*//' | sed '/^$/d' \
             | sed 's/\*\*//g' > changelog.txt || true
+          # 上游没变（force 重出包）时，本次生成的说明会拿错 CHANGELOG 小节，且上游段落
+          # 可能是空的 —— 直接沿用上一版 Release 里挂着的那份，保证管理器里看到的是
+          # 「当时这一版到底改了什么」。
+          if [ "$UP" = "$(cat UPSTREAM 2>/dev/null | tr -d ' \r\n')" ]; then
+            prev=$(gh release list -R "$GITHUB_REPOSITORY" -L 20 --json tagName -q '.[].tagName' 2>/dev/null \
+                   | grep -v "v${V}$" | head -1 || true)
+            if [ -n "$prev" ]; then
+              if gh release download "$prev" -R "$GITHUB_REPOSITORY" -p changelog.txt -O changelog.prev --clobber 2>/dev/null && [ -s changelog.prev ]; then
+                echo "上游未变，沿用 $prev 的 changelog.txt（$(wc -l < changelog.prev) 行）"
+                mv changelog.prev changelog.txt
+              fi
+            fi
+          fi
           if [ ! -s changelog.txt ]; then
             echo "运行体 $UP；本版说明见 Releases 页。" > changelog.txt
           fi

@@ -56,12 +56,14 @@ DATA_DIR=${AG2A_DATA_DIR:-/data/adb/ag2a}
 mkdir -p "$DATA_DIR" "$DATA_DIR/debug"
 set_perm_recursive "$DATA_DIR" 0 0 0700 0600
 
-# ---------- 刷入时选择：只能读音量键 ----------
+# ---------- 刷入时选择：音量键 + 5 秒倒计时 ----------
 # Magisk / APatch / KernelSU 的安装界面没有输入框，也不把 stdin 交给 customize.sh：
 #   用 read 会永久阻塞（现象＝进度条卡住、提示也不显示），用 echo 也不显示。
 # 业界可行做法（OpenList-Magisk / box_for_magisk 等）是读 /dev/input 的音量键：
-#   音量下 = 切下一项，音量上 = 确认。**一直等，没有超时**——只有按了音量上才往下走。
-# 唯一的自动退出：本机没有 getevent / timeout（极少见），那就只能用默认值。
+#   音量下 = 切下一项，音量上 = 确认。
+# ⚠ 必须带倒计时：早年这里是无超时的死等，不按键就永远卡在进度条上，
+#   用户以为刷坏了。现在 5 秒没动就采用当前项（默认项都是「不改动」那一个）。
+AG2A_PICK_TIMEOUT=${AG2A_PICK_TIMEOUT:-5}
 
 _key_once() {
     # 最多阻塞 1 秒；只认 KEY_VOLUMEUP / KEY_VOLUMEDOWN 的按下事件。
@@ -83,6 +85,7 @@ _nth() {
 }
 
 # choose "标题" 默认序号 选项1 选项2 ...  ⇒ 结果在 $CHOICE，采用值在 $PICKED
+# 交互：音量下切项、音量上确认；${AG2A_PICK_TIMEOUT} 秒内没有任何按键＝自动确认当前项。
 choose() {
     _ct=$1; _cd=$2; shift 2
     _cn=$#
@@ -94,20 +97,26 @@ choose() {
         return
     fi
     ui_print " "
-    ui_print "- $_ct: 音量下=切换  音量上=确认"
+    ui_print "- $_ct: 音量下=切换  音量上=确认  不按=${AG2A_PICK_TIMEOUT}秒后自动确认"
     ui_print "  → $(_nth "$_cur" "$@")"
-    while :; do
+    _left=$AG2A_PICK_TIMEOUT
+    _picked_by_key=0
+    while [ "$_left" -gt 0 ]; do
         case "$(_key_once)" in
             down)
                 _cur=$((_cur % _cn + 1))
-                ui_print "  → $(_nth "$_cur" "$@")"
-                sleep 0.25 ;;
+                _left=$AG2A_PICK_TIMEOUT
+                ui_print "  → $(_nth "$_cur" "$@")  (${_left}s)" ;;
             up)
+                _picked_by_key=1
+                _left=0
                 break ;;
         esac
-        # 屏幕静止时 getevent 自己就阻塞满 1 秒，这里只防事件流很密时空转烧 CPU
-        sleep 0.15 2>/dev/null || sleep 1
+        _left=$((_left - 1))
+        [ "$_left" -gt 0 ] && ui_print "  …${_left}s"
+        # getevent 已阻塞约 1 秒，这里不再补 sleep，免得把倒计时拉长到 2 倍
     done
+    [ "$_picked_by_key" = "0" ] && ui_print "  (${AG2A_PICK_TIMEOUT} 秒内没有操作，采用当前项)"
     CHOICE=$_cur
     PICKED=$(_nth "$_cur" "$@")
     # 确认后停一下：音量上键松开得慢的话，残留事件会把下一个问题也秒确认掉
@@ -128,7 +137,7 @@ if [ -s "$DATA_DIR/port" ] || [ -s "$DATA_DIR/env" ]; then _installed=1; fi
 
 # ---------- 已安装：第一个问题就问要不要动配置 ----------
 # 升级安装最怕的就是「刷一下配置全被重置」，所以默认项是「保持默认」，
-# 音量上直接确认＝什么都不改。只有明确选「重新设置」才往下问。
+# 音量上直接确认＝什么都不改；不倒计时也是它。只有明确选「重新设置」才往下问。
 RECONF=1
 AUTO_ON=""
 if [ "$_installed" = "1" ]; then
