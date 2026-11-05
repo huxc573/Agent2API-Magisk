@@ -43,14 +43,25 @@ for r in "${REPOS[@]}"; do
 done
 
 CUR="$(cat UPSTREAM 2>/dev/null | tr -d ' \r\n' || true)"
+
+# 上次发出的版本号（写 update.json 时一并记到 LAST_VERSION）。上游没变、但
+# CHANGELOG 或打包脚本改了，也该重出一个包 —— 否则「只改了说明/脚本」的修复
+# 永远到不了用户手上。FORCE=1 时忽略一切判断强出。
+LASTV="$(cat LAST_VERSION 2>/dev/null | tr -d ' \r\n' || true)"
+FINGER="$(cat CHANGELOG.md src/*.sh src/module.prop src/webroot/index.html build_module.py scripts/ci/*.sh 2>/dev/null | sha256sum | cut -c1-16)"
+LASTF="$(cat LAST_FINGER 2>/dev/null | tr -d ' \r\n' || true)"
+
 echo "上游 tag: $TAG（仓库记录: ${CUR:-空}），本包 prerelease=$PRE"
+echo "上次版本: ${LASTV:-空}，内容指纹: $FINGER（上次 ${LASTF:-空}）"
+
+SKIP=0
+if [ "$TAG" = "$CUR" ] && [ "$FINGER" = "$LASTF" ] && [ "${FORCE:-0}" != "1" ]; then
+    SKIP=1
+fi
 
 {
     echo "tag=$TAG"
     echo "prerelease=$PRE"
-    if [ "$TAG" = "$CUR" ] && [ "${FORCE:-0}" != "1" ]; then
-        echo "skip=1"
-    else
-        echo "skip=0"
-    fi
+    echo "finger=$FINGER"
+    echo "skip=$SKIP"
 } >> "${GITHUB_OUTPUT:?GITHUB_OUTPUT 未设置}"

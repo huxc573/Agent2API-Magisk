@@ -117,18 +117,31 @@ jobs:
           # 走 GitHub Pages（源＝main 根目录）：raw.githubusercontent 国内基本连不上，
           # Pages 直连可用。仓库 Pages 需在 main 根目录开启，否则这里 404。
           pages="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
+          # changelog 只放**本次这一版**的说明，不要把整个 CHANGELOG.md 塞过去：
+          # 管理器那个框是逐行滚的纯文本，几百行历史在里面既难看又没法定位；
+          # 而且 CHANGELOG 里难免混着给开发者看的过程说明，不该出现在用户面前。
+          # 取法：CHANGELOG 里第一小节（最新一版）的正文，去掉标题、空行与 markdown 粗体标记。
+          awk 'BEGIN{n=0} /^## /{n++; if(n==2) exit} n==1' CHANGELOG.md \
+            | sed '1d' | sed 's/^[[:space:]]*//' | sed '/^$/d' \
+            | sed 's/\*\*//g' > changelog.txt || true
+          if [ ! -s changelog.txt ]; then
+            echo "运行体 $UP；本版说明见 Releases 页。" > changelog.txt
+          fi
+          echo "（上游运行体 $UP）" >> changelog.txt
           cat > update.json <<EOF
           {
             "version": "$ver",
             "versionCode": $vc,
             "zipUrl": "${GH_PROXY}${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/v${V}/$(basename "$zip")",
-            "changelog": "$pages/CHANGELOG.md"
+            "changelog": "$pages/changelog.txt"
           }
           EOF
           echo "$UP" > UPSTREAM
+          echo "$ver" > LAST_VERSION
+          echo "${{ steps.up.outputs.finger }}" > LAST_FINGER
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add UPSTREAM update.json
+          git add UPSTREAM update.json changelog.txt LAST_VERSION LAST_FINGER
           # 上游没变时（force 出包）UPSTREAM 可能没 diff，但 update.json 一定变了；
           # 两个都没变才跳过，别让 git commit 以 1 退出
           if git diff --cached --quiet; then
