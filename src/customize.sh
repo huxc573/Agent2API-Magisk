@@ -329,9 +329,10 @@ else
     _rt_ok=0
 fi
 
-# 插件入口套壳：插件是上一版就装好的（在 /data/adb/ag2a/plugins），刷完这一刻就能修，
-# 不用等重启。壳里写的 loader 路径必须是 FINAL_DIR —— 这里 $MODPATH 是临时目录。
-AG2A_DATA_DIR="$DATA_DIR" AG2A_MODDIR="$MODPATH" AG2A_WRAP_MODDIR="$FINAL_DIR" \
+# 插件解释器修复：插件是上一版就装好的（在 /data/adb/ag2a/plugins），刷完这一刻就能修，
+# 不用等重启。软链固定指 /data/adb/ag2a/ld.so → 最终模块目录里的 loader，所以这里是
+# $FINAL_DIR；首次安装没有旧模块目录、也没有插件，脚本会自己跳过。
+AG2A_DATA_DIR="$DATA_DIR" AG2A_MODDIR="$FINAL_DIR" \
     sh "$MODPATH/pluginfix.sh" quiet >/dev/null 2>&1
 
 # 自动更新当前状态：update.off 或 AG2A_UPDATE_INTERVAL=0 都算关闭（与 lib.sh 的 ag2a_update_on 同规则）

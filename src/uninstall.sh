@@ -38,6 +38,8 @@ if [ -f "$WORK/update.timer.pid" ]; then
 fi
 # 老版本（v1.6.0/1）遗留的 crontab 与 crond 一并清掉
 rm -f "$WORK/crontab" "$WORK/crontab.tmp" 2>/dev/null
+# 插件解释器软链：指向本模块目录，卸载后就是死链，带走
+rm -f /data/adb/ag2a/ld.so 2>/dev/null
 
 # 兜底：老版本的常驻循环 / 网关进程（v1.5.x 及以前）
 # 四条路径都要扫：v1.9.0 起网关从 rt/ 起，模块目录里那份只是回退（见 lib.sh）

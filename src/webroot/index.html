@@ -30,9 +30,6 @@
   .btnrow>button{flex:1;margin:0;padding:13px 6px;font-size:14px}
   .btnrow>button.danger{color:var(--warn)}
   button.b[disabled]{opacity:.55;cursor:default}
-  pre.log{margin:6px 0 0;padding:8px 10px;border-radius:9px;background:var(--btn2);color:var(--dim);
-          font:11.5px/1.55 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;
-          max-height:168px;overflow:auto}
   .tip{color:var(--dim);font-size:12px;margin:14px 0 0;line-height:1.75}
   .warn{color:var(--warn)}
   .ok{color:var(--ok)}
@@ -58,13 +55,6 @@
   </div>
   <button class="b" id="br" type="button">用浏览器打开</button>
   <button class="b" id="rel" type="button">打开 GitHub 更新地址</button>
-
-  <div class="box" style="margin-top:4px">
-    <div class="row"><span class="k">日志</span>
-      <span class="v dim">run.log 尾部 <button id="lg" type="button"
-        style="float:right;border:0;background:none;color:var(--btn);font:inherit;padding:0;cursor:pointer">刷新</button></span></div>
-    <pre class="log" id="log">读取中…</pre>
-  </div>
 
   <p class="tip" id="tip">&nbsp;</p>
 </div>
@@ -121,7 +111,6 @@
 
     document.getElementById('rt').textContent =
       (mcode && rcode && mcode !== rcode) ? '· 运行体未同步（点「执行」或重启）' : '';
-    readLog();
   }
   refreshState();
 
@@ -186,22 +175,6 @@
   });
   document.getElementById('br').addEventListener('click', function () { openUrl(url); });
   document.getElementById('rel').addEventListener('click', function () { openUrl(REL); });
-
-  // ---------- 日志 ----------
-  // 起不来时唯一有信息量的地方：watchdog 把网关的 stdout/stderr 直接写进 run.log。
-  // 过滤掉 [watchdog] 那几句「重拉中」，只留网关自己的报错。
-  function readLog() {
-    var lg = document.getElementById('log');
-    var t = sh('tail -n 40 /data/adb/ag2a/run.log');
-    if (t == null) { lg.textContent = '读不到日志（管理器没注入 shell 时正常）'; return; }
-    var lines = String(t).split('\n').filter(function (l) {
-      return l.trim() && l.indexOf('[watchdog]') < 0;
-    });
-    lg.textContent = lines.length ? lines.slice(-10).join('\n') : '（暂无日志）';
-    lg.scrollTop = lg.scrollHeight;
-  }
-  readLog();
-  document.getElementById('lg').addEventListener('click', readLog);
 
   document.getElementById('tip').innerHTML = (raw === null)
     ? '读不到模块配置，按默认端口 ' + PORT + ' 打开；改过端口就用命令行 <code>sh action.sh open</code>。'

@@ -8,7 +8,7 @@
 
 > **上游与致谢**：服务本体、panel UI、官方插件全部来自
 > [aimod-cc/agent2api](https://github.com/aimod-cc/agent2api)（**MIT**，镜像 `aimodcc/agent2api`）。
-> 本项目只做「把它装进 Android」这层壳——挂载逻辑、启动/看门狗、插件启动壳、WebUI 入口页、打包与 CI。
+> 本项目只做「把它装进 Android」这层壳——挂载逻辑、启动/看门狗、插件解释器修复、WebUI 入口页、打包与 CI。
 > Release 里的运行体由 CI 原样取自上游（优先用上游 Release 资产并校验其 `.sha256`，没有资产才从官方镜像 `aimodcc/agent2api` 抽），未改二进制。详见 [THIRD-PARTY.md](THIRD-PARTY.md)。
 
 ## 安装
@@ -63,7 +63,7 @@ su -c "sh $M/check.sh"              # 自检：文件 / 依赖 / 端口 / 进程
 su -c "sh $M/action.sh config"      # 改端口、管理员、更新钟点（会重启网关）
 su -c "sh $M/action.sh open"        # 系统浏览器打开面板
 su -c "sh $M/action.sh reset"       # 清账号库，回到「创建账号」页
-su -c "sh $M/action.sh fixplugins"  # 插件入口重新套壳（见下）
+su -c "sh $M/action.sh fixplugins"  # 重新修一次插件解释器（见下）
 su -c "sh $M/service.sh stop|start|restart"
 su -c "sh $M/rt.sh status"          # rt/ 与模块目录各是哪个版本
 su -c "tail -50 /data/adb/ag2a/run.log"
@@ -92,15 +92,12 @@ su -c "tail -50 /data/adb/ag2a/run.log"
 它们同样是 glibc 二进制，ELF 解释器写死 `/lib/ld-linux-aarch64.so.1`——Android 根目录没有 `/lib`，
 `execve` 返回 ENOENT，面板日志就是 `启动插件进程失败（…）: No such file or directory (os error 2)`（文件其实在）。
 
-`pluginfix.sh` 在网关启动前把入口换成 4 行启动壳，真身挪到同目录 `.real`：
+`pluginfix.sh` 在网关启动前把这些二进制的 `PT_INTERP` 原地改成 `/data/adb/ag2a/ld.so`
+（软链指向模块自带的 loader）：原槽位 27 字节，新串 21 字节，其余补 0，
+**phdr、文件长度、偏移都不动**；改完回读校验，写得不对就整份丢弃，不会把插件改坏。
+loader 找 libc 靠 `service.sh` 里 export 的 `LD_LIBRARY_PATH`（Android 既没有 `/lib`，也没有 `ld.so.cache`）。
 
-```sh
-#!/system/bin/sh
-exec /data/adb/modules/ag2a/lib/ld-linux-aarch64.so.1 \
-     --library-path "/data/adb/modules/ag2a/lib:${0%/*}" "${0}.real" "$@"
-```
-
-只碰 ELF、遇到 `#!` 跳过 ⇒ 幂等；插件升级换回 ELF 后下次启动自动重套。
+已经是目标值就跳过 ⇒ 幂等，每次启动都可以跑。
 
 ## 进程模型
 

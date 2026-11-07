@@ -207,6 +207,10 @@ export AGENT2API_PROXY_PORT="$PORT_FORCED"
 
 eval "$(ag2a_cert_env)"     # rustls 不内嵌根证书
 eval "$(ag2a_tz_env)"       # 二进制读 /usr/share/zoneinfo
+# 插件被我们改成用 /data/adb/ag2a/ld.so（软链到模块自带 loader）启动，那份 loader
+# 要能找到 libc/libm/libgcc_s，只认 LD_LIBRARY_PATH 这条（Android 无 /lib、无 ld.so.cache）。
+# 插件是网关的子进程，所以在这里 export 就够了。
+export LD_LIBRARY_PATH="$MODDIR/lib"
 
 # ---------- 管理员：只在明确设过密码时播种 ----------
 # 上游 env 不参与认证（只认 db 里的 bcrypt 哈希），唯一可用入口是 POST /api/panel/setup。
