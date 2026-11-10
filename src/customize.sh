@@ -41,7 +41,7 @@ done
 [ -f "$MODPATH/bin/agent2api-server" ] && set_perm "$MODPATH/bin/agent2api-server" 0 0 0755
 # loader 必须可执行，否则网关根本起不来
 [ -f "$MODPATH/lib/ld-linux-aarch64.so.1" ] && set_perm "$MODPATH/lib/ld-linux-aarch64.so.1" 0 0 0755
-for _f in lib/libc.so.6 lib/libm.so.6 lib/libgcc_s.so.1; do
+for _f in lib/libc.so.6 lib/libm.so.6 lib/libgcc_s.so.1 lib/libpthread.so.0 lib/libdl.so.2 lib/librt.so.1; do
     [ -f "$MODPATH/$_f" ] && set_perm "$MODPATH/$_f" 0 0 0644
 done
 [ -f "$MODPATH/module.prop" ] && set_perm "$MODPATH/module.prop" 0 0 0644

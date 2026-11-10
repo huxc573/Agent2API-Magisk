@@ -30,6 +30,11 @@ RUNTIME = {
     os.path.join(ROOTFS, "lib", "libgcc_s.so.1"): "lib/libgcc_s.so.1",
     # spawn hook：让 glibc 插件在缺 /lib 的 Android 上能被拉起来（源码见 src/spawnhook/）
     os.path.join(SRC, "spawnhook", "libspawnhook.so"): "lib/libspawnhook.so",
+    # 老 soname 空壳：Bun（脚本插件运行时）仍写死 NEEDED libpthread.so.0 等，
+    # glibc 2.34 起它们并进 libc，只剩发行版里的空壳，见 src/compat/README.md
+    os.path.join(SRC, "compat", "libpthread.so.0"): "lib/libpthread.so.0",
+    os.path.join(SRC, "compat", "libdl.so.2"): "lib/libdl.so.2",
+    os.path.join(SRC, "compat", "librt.so.1"): "lib/librt.so.1",
     os.path.join(ROOTFS, "etc", "ca-certificates.crt"): "etc/ca-certificates.crt",
     os.path.join(ROOTFS, "usr", "share", "zoneinfo", "Asia", "Shanghai"): "zoneinfo/Asia/Shanghai",
 }
