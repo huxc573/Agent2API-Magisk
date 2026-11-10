@@ -231,10 +231,9 @@ cd "$WORK" || exit 1
 # ⚠ 空参数也要走这里：APatch / Magisk 开机执行的是无参的 `sh service.sh`，
 #   历史上它走的是「前台 exec 网关」，于是看门狗永远不会被拉起（1.6.4 的真实 bug）。
 if [ -z "$1" ] || [ "$1" = "start" ]; then
-    # 插件入口套壳：插件是 glibc 独立进程，Android 没有 /lib/ld-linux-aarch64.so.1，
-    # 面板直接 exec 会 ENOENT（日志里那句 No such file or directory）。必须在网关起来前修好，
-    # 否则面板加载插件还是失败。幂等、只碰 plugins/*/*/bin 下的 ELF，开销可忽略。
-    sh "$MODDIR/pluginfix.sh" quiet >/dev/null 2>&1
+    # 插件是 glibc 独立进程，Android 没有 /lib/ld-linux-aarch64.so.1，面板直接 exec 会 ENOENT。
+    # 解法不是改插件文件（那会破坏签名），而是给网关 --preload 一个 spawn hook：
+    # lib.sh 的 ag2a_preload_arg()，spawn 那一刻自动换成模块自带 loader，插件保持原样。
     # 网关不再由这里直接起，而是交给看门狗（它负责崩溃重拉）
     if ! start_watchdog; then
         echo "[ag2a] 看门狗没能启动（$WORK/watchdog.pid 未出现）" >&2

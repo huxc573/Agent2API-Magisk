@@ -204,8 +204,15 @@ stop)
     echo "网关已停止"
     exit 0 ;;
 fixplugins)
-    # 面板装完/升级插件后入口又变回 ELF，跑一次这个重新套壳（不重启网关也行，插件再启一次即可）
-    sh "$MODDIR/pluginfix.sh"
+    # 插件的解释器问题已由网关侧的 spawn hook 解决（lib.sh 的 ag2a_preload_arg），
+    # 插件文件保持原样、签名完好。这个子命令留着只报状态，便于排障。
+    if [ ! -f "$MODDIR/lib/$AG2A_HOOK_LIB" ]; then
+        echo "缺少 $MODDIR/lib/$AG2A_HOOK_LIB —— 插件可能起不来"
+    elif [ -f "$WORK/spawnhook.off" ]; then
+        echo "⚠ $WORK/spawnhook.off 存在，spawn hook 已旁路（删掉再重启网关即恢复）"
+    else
+        echo "spawn hook 已就位（$AG2A_HOOK_LIB），插件无需修复"
+    fi
     exit 0 ;;
 open)
     PORT=$(ag2a_get_port)

@@ -63,7 +63,7 @@ su -c "sh $M/check.sh"              # 自检：文件 / 依赖 / 端口 / 进程
 su -c "sh $M/action.sh config"      # 改端口、管理员、更新钟点（会重启网关）
 su -c "sh $M/action.sh open"        # 系统浏览器打开面板
 su -c "sh $M/action.sh reset"       # 清账号库，回到「创建账号」页
-su -c "sh $M/action.sh fixplugins"  # 重新修一次插件解释器（见下）
+su -c "sh $M/action.sh fixplugins"  # 查插件 spawn hook 状态（见下）
 su -c "sh $M/service.sh stop|start|restart"
 su -c "sh $M/rt.sh status"          # rt/ 与模块目录各是哪个版本
 su -c "tail -50 /data/adb/ag2a/run.log"
@@ -92,12 +92,21 @@ su -c "tail -50 /data/adb/ag2a/run.log"
 它们同样是 glibc 二进制，ELF 解释器写死 `/lib/ld-linux-aarch64.so.1`——Android 根目录没有 `/lib`，
 `execve` 返回 ENOENT，面板日志就是 `启动插件进程失败（…）: No such file or directory (os error 2)`（文件其实在）。
 
-`pluginfix.sh` 在网关启动前把这些二进制的 `PT_INTERP` 原地改成 `/data/adb/ag2a/ld.so`
-（软链指向模块自带的 loader）：原槽位 27 字节，新串 21 字节，其余补 0，
-**phdr、文件长度、偏移都不动**；改完回读校验，写得不对就整份丢弃，不会把插件改坏。
-loader 找 libc 靠 `service.sh` 里 export 的 `LD_LIBRARY_PATH`（Android 既没有 `/lib`，也没有 `ld.so.cache`）。
+**不改插件，改网关的 spawn。** 网关本来就是我们用 loader 拉起来的，启动时给它多带一个参数：
 
-已经是目标值就跳过 ⇒ 幂等，每次启动都可以跑。
+```
+ld-linux-aarch64.so.1 --library-path <模块lib> --preload <模块lib>/libspawnhook.so agent2api-server
+```
+
+`libspawnhook.so` 拦下 `posix_spawnp` / `posix_spawn` / `execve` / `execvp`：
+发现目标 ELF 的解释器是 `/lib/ld-linux-aarch64.so.1` 且该路径不存在，就改用模块自带的 loader 拉起同一个文件。
+
+好处是**插件文件一个字节都不动**——官方签名完好，面板里「下载并安装」和自动升级照常成功，
+装完立刻就能跑，不需要重启、不需要手动修、也没有任何时间窗口要抢。
+`/system/bin/*` 这类 bionic 程序（解释器是 `/system/bin/linker64`）不匹配，完全不碰。
+
+排障：`touch /data/adb/ag2a/spawnhook.off` 即完全旁路；启动前会用 `--list` 自检，库加载不了就不带这个参数，
+不会因为一个 hook 把网关拖死。`action.sh fixplugins` 可查当前状态。
 
 ## 进程模型
 

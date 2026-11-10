@@ -28,11 +28,13 @@ RUNTIME = {
     os.path.join(ROOTFS, "lib", "libc.so.6"): "lib/libc.so.6",
     os.path.join(ROOTFS, "lib", "libm.so.6"): "lib/libm.so.6",
     os.path.join(ROOTFS, "lib", "libgcc_s.so.1"): "lib/libgcc_s.so.1",
+    # spawn hook：让 glibc 插件在缺 /lib 的 Android 上能被拉起来（源码见 src/spawnhook/）
+    os.path.join(SRC, "spawnhook", "libspawnhook.so"): "lib/libspawnhook.so",
     os.path.join(ROOTFS, "etc", "ca-certificates.crt"): "etc/ca-certificates.crt",
     os.path.join(ROOTFS, "usr", "share", "zoneinfo", "Asia", "Shanghai"): "zoneinfo/Asia/Shanghai",
 }
 
-SHELLS = ["service.sh", "control.sh", "refresh.sh", "rt.sh", "pluginfix.sh", "updater.sh", "action.sh", "uninstall.sh", "watchdog.sh"]
+SHELLS = ["service.sh", "control.sh", "refresh.sh", "rt.sh", "updater.sh", "action.sh", "uninstall.sh", "watchdog.sh"]
 EXEC = set(SHELLS) | {"customize.sh", "check.sh"}
 
 EM_AARCH64 = 0xB7   # 防呆：曾经把 amd64 的 so 打进包里

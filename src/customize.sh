@@ -35,7 +35,7 @@ esac
 
 # ---------- 权限 ----------
 # 1.5.x 靠这里补可执行位；1.6.x 起 zip 里已带模式位，这里再兜一次（Windows 打包会丢）。
-for _f in action.sh check.sh control.sh pluginfix.sh refresh.sh rt.sh service.sh uninstall.sh updater.sh watchdog.sh; do
+for _f in action.sh check.sh control.sh refresh.sh rt.sh service.sh uninstall.sh updater.sh watchdog.sh; do
     [ -f "$MODPATH/$_f" ] && set_perm "$MODPATH/$_f" 0 0 0755
 done
 [ -f "$MODPATH/bin/agent2api-server" ] && set_perm "$MODPATH/bin/agent2api-server" 0 0 0755
@@ -329,11 +329,8 @@ else
     _rt_ok=0
 fi
 
-# 插件解释器修复：插件是上一版就装好的（在 /data/adb/ag2a/plugins），刷完这一刻就能修，
-# 不用等重启。软链固定指 /data/adb/ag2a/ld.so → 最终模块目录里的 loader，所以这里是
-# $FINAL_DIR；首次安装没有旧模块目录、也没有插件，脚本会自己跳过。
-AG2A_DATA_DIR="$DATA_DIR" AG2A_MODDIR="$FINAL_DIR" \
-    sh "$MODPATH/pluginfix.sh" quiet >/dev/null 2>&1
+# 插件解释器问题由网关侧的 spawn hook 解决（lib.sh 的 ag2a_preload_arg），
+# 不再需要动插件文件，签名也不会被破坏。
 
 # 自动更新当前状态：update.off 或 AG2A_UPDATE_INTERVAL=0 都算关闭（与 lib.sh 的 ag2a_update_on 同规则）
 _upd=开启

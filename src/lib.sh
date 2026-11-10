@@ -34,6 +34,7 @@ ag2a_data_dir() {
 AG2A_ID=ag2a
 AG2A_BIN_NAME=agent2api-server
 AG2A_LD_NAME=ld-linux-aarch64.so.1
+AG2A_HOOK_LIB=libspawnhook.so
 
 # 运行体（bin/ + ui/）的权威位置＝数据目录下的 rt/。
 # 为什么不用模块目录：/data/adb/modules/ag2a 是 Magisk 的地盘，只有**下次启动**才会被
@@ -82,12 +83,28 @@ ag2a_rt_need_sync() {
     return 0
 }
 
-# 启动器：loader --library-path <模块lib> <二进制>
+# 插件 spawn 拦截：插件是 glibc 二进制，ELF 里 PT_INTERP 写死 /lib/ld-linux-aarch64.so.1，
+# 而 Android 根目录没有 /lib（有的 ROM 直接删了），execve 返回 ENOENT —— 插件装完起不来。
+# 网关本来就是我们用 loader 拉起来的，给它 --preload 一个 hook 库，就能在 spawn 插件那一刻
+# 把目标换成模块自带的 loader：插件文件一个字节不改（签名完好）、网关不用改、也不用抢时机。
+# 自检（--list 走一遍依赖解析）不过就不带，绝不让一个 hook 把网关拖死。
+# 排障：`touch /data/adb/ag2a/spawnhook.off` 即完全旁路。
+ag2a_preload_arg() {
+    _so="$MODDIR/lib/$AG2A_HOOK_LIB"
+    [ -f "$_so" ] || return 0
+    [ -f "$WORK/spawnhook.off" ] && return 0
+    "$MODDIR/lib/$AG2A_LD_NAME" --library-path "$MODDIR/lib" --preload "$_so" \
+        --list "$(ag2a_bin)" >/dev/null 2>&1 || return 0
+    printf -- '--preload %s' "$_so"
+}
+
+# 启动器：loader --library-path <模块lib> [--preload <hook>] <二进制>
 # 用 loader 直接跑，不 chroot、不建 rootfs：二进制只依赖 libc/libm/libgcc_s。
 # ⚠ loader 与 lib/ 始终留在模块目录（上游从没换过它们，没必要跟着版本搬）。
 ag2a_cmdline() {
-    printf '%s --library-path %s %s' \
-        "$MODDIR/lib/$AG2A_LD_NAME" "$MODDIR/lib" "$(ag2a_bin)"
+    _pl=$(ag2a_preload_arg)
+    printf '%s --library-path %s %s %s' \
+        "$MODDIR/lib/$AG2A_LD_NAME" "$MODDIR/lib" "$_pl" "$(ag2a_bin)"
 }
 
 # ---------- 配置 ----------
