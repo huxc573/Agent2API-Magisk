@@ -136,7 +136,7 @@ jobs:
           # 取法：CHANGELOG 里第一小节（最新一版）的正文，去掉标题、空行与 markdown 粗体标记。
           awk 'BEGIN{n=0} /^## /{n++; if(n==2) exit} n==1' CHANGELOG.md \
             | sed '1d' | sed 's/^[[:space:]]*//' | sed '/^$/d' \
-            | sed 's/\*\*//g' > changelog.txt || true
+            | sed 's/\*\*//g' | sed 's/`//g' > changelog.txt || true
           # 上游没变（force 重出包）时，本次生成的说明会拿错 CHANGELOG 小节，且上游段落
           # 可能是空的 —— 直接沿用上一版 Release 里挂着的那份，保证管理器里看到的是
           # 「当时这一版到底改了什么」。
@@ -153,7 +153,18 @@ jobs:
           if [ ! -s changelog.txt ]; then
             echo "运行体 $UP；本版说明见 Releases 页。" > changelog.txt
           fi
-          echo "（上游运行体 $UP）" >> changelog.txt
+          # 管理器弹窗首行：本包版本号 + 构建时刻。版本号本身带日期（26.11.10_2），
+          # 所以只补时间，不重复写日期；风格与 wb2a 模块的更新说明一致。
+          # force 重出包时会沿用上一版的 changelog.txt，首行还是旧版本号、末尾还带着上一版
+          # 的运行体脚注 —— 先统一剥掉，再按当前版本重写，别让弹窗显示成旧版本。
+          sed -e '1s/^本模块 .*发布于 .*$//' -e '/^（上游运行体 .*）$/d' changelog.txt > changelog.body
+          sed -i '1{/^[[:space:]]*$/d}' changelog.body
+          {
+            printf '本模块 %s　发布于 %s UTC+8\n\n' "$ver" "$(TZ=Asia/Shanghai date '+%H:%M')"
+            cat changelog.body
+          } > changelog.txt
+          rm -f changelog.body
+          printf '\n（上游运行体 %s）\n' "$UP" >> changelog.txt
           cat > update.json <<EOF
           {
             "version": "$ver",

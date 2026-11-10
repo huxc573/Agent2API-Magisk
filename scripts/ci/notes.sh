@@ -79,7 +79,9 @@ EOF
 # ---- 管理器更新日志（changelog.txt）：本模块改动 + 上游改动 ----
 # 管理器那个框是纯文本、逐行滚的，所以这里只留要点，不带 markdown 语法与内部过程。
 # 上游那一段很重要：用户点「更新」时最想知道的就是「上游这次修了什么」。
+# 首行写本包版本号 + 构建时刻：版本号本身带日期，所以只补时间（UTC+8），与 wb2a 模块一致。
 {
+    printf '本模块 %s　发布于 %s UTC+8\n\n' "$V" "$(TZ=Asia/Shanghai date '+%H:%M')"
     printf '%s\n' "$LOCAL" | sed 's/\*\*//g' | sed 's/`//g' | sed 's/^[[:space:]]*//' | sed '/^$/d'
     if [ -n "$UP_BODY" ] && [ "$UP_BODY" != "（上游没有可读的 release 说明或提交信息）" ]; then
         printf '\n【上游 %s】\n' "$UP"
