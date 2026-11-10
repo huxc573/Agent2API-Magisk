@@ -30,6 +30,8 @@ SRC="${CHANGELOG_SRC:-CHANGELOG.md}"
 UPREPO="${AG2A_UPSTREAM_REPO:-aimod-cc/Agent2API}"
 UPV="${UP#v}"
 UP_CAP=20          # 上游条目上限，超过就截断并注明去 Releases 看全
+# 解析 JSON 用：CI 的 ubuntu 自带 python3，Windows 上一般只有 python
+PY="$(command -v python3 || command -v python || true)"
 
 # ---------- 本模块这版 ----------
 # 优先用上一版 changelog 里的模块段：上游没变、force 重出包时，CHANGELOG.md 的首节
@@ -61,10 +63,17 @@ self_body="$(printf '%s\n' "$self_body" \
 up_body=""
 up_total=0
 if [ -n "$UP" ] && command -v gh >/dev/null 2>&1; then
-    # 上游 tag 带不带 v 都有（v3.5.0-beta.1 / web-v3.4.3），两种都试一次
+    # 上游 tag 带不带 v 都有（v3.5.0-beta.1 / web-v3.4.3），两种都试一次。
+    # CI 里的 GITHUB_TOKEN 只覆盖本仓库，读别的仓库常常拿不到 → 退回匿名 API（公开仓库可用）。
+    _fetch_notes() {
+        gh release view "$1" -R "$UPREPO" --json body --jq .body 2>/dev/null && return 0
+        curl -sfL -m 20 -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$UPREPO/releases/tags/$1" 2>/dev/null \
+            | "$PY" -c 'import sys,json;print(json.load(sys.stdin).get("body") or "")' 2>/dev/null
+    }
     up_raw=""
     for _t in "v$UPV" "$UPV"; do
-        up_raw="$(gh release view "$_t" -R "$UPREPO" --json body --jq .body 2>/dev/null || true)"
+        up_raw="$(_fetch_notes "$_t" || true)"
         [ -n "$up_raw" ] && break
     done
     if [ -n "$up_raw" ]; then

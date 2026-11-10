@@ -102,6 +102,8 @@ jobs:
       - name: 写 update.json + 记账（UPSTREAM）
         if: steps.up.outputs.skip != '1'
         env:
+          # gh 读上游 release 说明、取上一版 changelog 都要鉴权；少了它就静默拿到空内容
+          GH_TOKEN: ${{ github.token }}
           UP: ${{ steps.up.outputs.tag }}
           V: ${{ steps.ver.outputs.version }}
         run: |
