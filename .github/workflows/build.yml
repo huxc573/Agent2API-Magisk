@@ -136,23 +136,9 @@ jobs:
           # 管理器那个框是逐行滚的纯文本，几百行历史在里面既难看又没法定位。
           # 内容与格式全部由 scripts/ci/changelog.sh 决定（版本头 + 本模块改动 + 上游改动），
           # notes.sh 生成 Release 说明时用的是同一个脚本 ⇒ 两处不会走样。
-          # 上游没变（force 重出包）时把上一版挂的 changelog 传进去：只重写版本头，
-          # 正文沿用当时那份，避免 CHANGELOG.md 已经写成下一版时张冠李戴。
-          prev_cl=""
-          if [ "$UP" = "$(cat UPSTREAM 2>/dev/null | tr -d ' \r\n')" ]; then
-            prev_tag=$(gh release list -R "$GITHUB_REPOSITORY" -L 20 --json tagName -q '.[].tagName' 2>/dev/null \
-                       | grep -v "v${V}$" | head -1 || true)
-            if [ -n "$prev_tag" ]; then
-              if gh release download "$prev_tag" -R "$GITHUB_REPOSITORY" -p changelog.txt -O changelog.prev --clobber 2>/dev/null; then
-                if [ -s changelog.prev ]; then
-                  prev_cl=changelog.prev
-                  echo "上游未变，正文沿用 $prev_tag 的 changelog.txt"
-                fi
-              fi
-            fi
-          fi
-          bash scripts/ci/changelog.sh "$ver" "$UP" changelog.txt "$prev_cl"
-          rm -f changelog.prev
+          # 每版都从 CHANGELOG.md 的第一小节现生成，不引用上一版产物：
+          # 同号重出包（删了重发）时那样会把旧内容原样搬回来，反而更错。
+          bash scripts/ci/changelog.sh "$ver" "$UP" changelog.txt
           cat > update.json <<EOF
           {
             "version": "$ver",

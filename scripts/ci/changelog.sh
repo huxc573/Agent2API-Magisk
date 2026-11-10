@@ -15,7 +15,7 @@
 #   **其他更新**
 #   - 修复：…
 #
-# 用法: scripts/ci/changelog.sh <版本号> [上游 tag] [输出文件] [上一版 changelog]
+# 用法: scripts/ci/changelog.sh <版本号> [上游 tag] [输出文件]
 #   scripts/ci/changelog.sh 26.11.10_2 3.5.0-beta.1
 # 环境:
 #   AG2A_UPSTREAM_REPO  上游源码仓，默认 aimod-cc/Agent2API（读 release 说明用）
@@ -25,7 +25,6 @@ set -euo pipefail
 V="${1:?需要模块版本号，如 26.11.10_2}"
 UP="${2:-}"
 OUT="${3:-changelog.txt}"
-PREV="${4:-}"
 SRC="${CHANGELOG_SRC:-CHANGELOG.md}"
 UPREPO="${AG2A_UPSTREAM_REPO:-aimod-cc/Agent2API}"
 UPV="${UP#v}"
@@ -34,24 +33,10 @@ UP_CAP=20          # 上游条目上限，超过就截断并注明去 Releases �
 PY="$(command -v python3 || command -v python || true)"
 
 # ---------- 本模块这版 ----------
-# 优先用上一版 changelog 里的模块段：上游没变、force 重出包时，CHANGELOG.md 的首节
-# 可能已经写成下一个版本了，照抄会张冠李戴。剥离规则与下面写出的格式一一对应。
-self_from_prev() {
-    [ -s "$PREV" ] || return 0
-    awk '
-        NR == 1 && /^\*\*本模块 /        { next }   # 版本头
-        /^\*\*上游 .*的改动\*\*$/        { exit }   # 到这里开始是上游段
-        /^（上游运行体 .*）$/            { next }   # 旧格式尾注
-        { print }
-    ' "$PREV"
-}
-
-self_body=""
-[ -n "$PREV" ] && self_body="$(self_from_prev)"
-if [ -z "$(printf '%s' "$self_body" | tr -d '[:space:]')" ]; then
-    # CHANGELOG.md 第一小节正文（标题行去掉）
-    self_body="$(awk 'BEGIN{n=0} /^## /{n++; if(n==2) exit} n==1' "$SRC" 2>/dev/null | sed '1d' || true)"
-fi
+# 取 CHANGELOG.md 第一小节的正文（最新一版）。CI 的版本号就是当场算出来的，
+# 而 CHANGELOG 最上面那一节写的就是这一版，两者一致；不引用「上一版产物」——
+# 同号重出包时那样会把旧内容原样搬回来（踩过：上游未变时拿到的还是旧格式）。
+self_body="$(awk 'BEGIN{n=0} /^## /{n++; if(n==2) exit} n==1' "$SRC" 2>/dev/null | sed '1d' || true)"
 # 条目里的粗体/行内代码标记在弹窗里没意义，删掉；空行去掉（弹窗里只看条目）
 self_body="$(printf '%s\n' "$self_body" \
     | sed 's/\*\*//g' | sed 's/`//g' | sed 's/^[[:space:]]*//' | sed '/^$/d' || true)"
