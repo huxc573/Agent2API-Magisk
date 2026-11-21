@@ -58,6 +58,25 @@ jobs:
           echo "本次版本: v$v（versionCode $((10#${today//./} * 100 + n))）"
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
+      - name: 判断本模块本次是否有改动
+        id: self
+        if: steps.up.outputs.skip != '1'
+        run: |
+          set -euo pipefail
+          # 本模块的更新日志只在「CHANGELOG.md 这次真被改过」时显示。
+          # 只用 CHANGELOG.md 的内容哈希判断，不看版本号：自动跟随上游时版本号天天变，
+          # 但 CHANGELOG 一个字没改 ⇒ 再搬一遍上一版的手写日志就是重复噪音。
+          cur=$(sha256sum CHANGELOG.md | cut -d' ' -f1)
+          prev=$(cat LAST_CHANGELOG_SHA 2>/dev/null | tr -d ' \r\n' || true)
+          if [ -z "$prev" ] || [ "$prev" != "$cur" ]; then
+            echo "CHANGELOG.md 有改动 → 本次显示本模块更新内容"
+            echo "show=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "CHANGELOG.md 没改 → 本次只显示上游改动"
+            echo "show=0" >> "$GITHUB_OUTPUT"
+          fi
+          echo "cur=$cur" >> "$GITHUB_OUTPUT"
+
       - name: 抽取运行体
         id: rt
         if: steps.up.outputs.skip != '1'
@@ -79,6 +98,7 @@ jobs:
           V: ${{ steps.ver.outputs.version }}
           UP: ${{ steps.up.outputs.tag }}
           PRE: ${{ steps.up.outputs.prerelease }}
+          AG2A_SHOW_SELF: ${{ steps.self.outputs.show }}
         run: |
           set -euo pipefail
           zip="publish/Agent2API-Magisk-v${V}.zip"
@@ -106,6 +126,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           UP: ${{ steps.up.outputs.tag }}
           V: ${{ steps.ver.outputs.version }}
+          AG2A_SHOW_SELF: ${{ steps.self.outputs.show }}
         run: |
           set -euo pipefail
           zip="publish/Agent2API-Magisk-v${V}.zip"
@@ -150,9 +171,11 @@ jobs:
           echo "$UP" > UPSTREAM
           echo "$ver" > LAST_VERSION
           echo "${{ steps.up.outputs.finger }}" > LAST_FINGER
+          # 记下这次发布时 CHANGELOG.md 的内容哈希：下一版据此判断「模块有没有改」
+          echo "${{ steps.self.outputs.cur }}" > LAST_CHANGELOG_SHA
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add UPSTREAM update.json changelog.txt LAST_VERSION LAST_FINGER
+          git add UPSTREAM update.json changelog.txt LAST_VERSION LAST_FINGER LAST_CHANGELOG_SHA
           # 上游没变时（force 出包）UPSTREAM 可能没 diff，但 update.json 一定变了；
           # 两个都没变才跳过，别让 git commit 以 1 退出
           if git diff --cached --quiet; then

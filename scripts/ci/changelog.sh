@@ -36,10 +36,17 @@ PY="$(command -v python3 || command -v python || true)"
 # 取 CHANGELOG.md 第一小节的正文（最新一版）。CI 的版本号就是当场算出来的，
 # 而 CHANGELOG 最上面那一节写的就是这一版，两者一致；不引用「上一版产物」——
 # 同号重出包时那样会把旧内容原样搬回来（踩过：上游未变时拿到的还是旧格式）。
-self_body="$(awk 'BEGIN{n=0} /^## /{n++; if(n==2) exit} n==1' "$SRC" 2>/dev/null | sed '1d' || true)"
-# 条目里的粗体/行内代码标记在弹窗里没意义，删掉；空行去掉（弹窗里只看条目）
-self_body="$(printf '%s\n' "$self_body" \
-    | sed 's/\*\*//g' | sed 's/`//g' | sed 's/^[[:space:]]*//' | sed '/^$/d' || true)"
+#
+# ⚠ 只有「CHANGELOG.md 这次真被改过」才输出这一段（CI 传 AG2A_SHOW_SELF=0 关掉）。
+#   否则自动跟随上游出新包时，第一节还是上一次手改的内容，管理器每次更新都重复
+#   搬同一段旧日志；同时上游条目才是那一版真正的改动。
+self_body=""
+if [ "${AG2A_SHOW_SELF:-1}" != "0" ]; then
+    self_body="$(awk 'BEGIN{n=0} /^## /{n++; if(n==2) exit} n==1' "$SRC" 2>/dev/null | sed '1d' || true)"
+    # 条目里的粗体/行内代码标记在弹窗里没意义，删掉；空行去掉（弹窗里只看条目）
+    self_body="$(printf '%s\n' "$self_body" \
+        | sed 's/\*\*//g' | sed 's/`//g' | sed 's/^[[:space:]]*//' | sed '/^$/d' || true)"
+fi
 
 # ---------- 上游这版 ----------
 # 上游的说明是中文分节的编号列表（核心更新 / 其他更新），条目形如 "1. 新增：…"；
@@ -104,7 +111,7 @@ NOW="${CHANGELOG_NOW:-$(TZ=Asia/Shanghai date '+%H:%M' 2>/dev/null || date -u '+
             printf -- '- …（共 %s 条，完整说明见 Releases 页）\n' "$up_total"
         fi
     elif [ -z "$self_body" ]; then
-        printf '\n- 本版仅更新运行体到上游 `%s`，无其它改动。\n' "${UPV:-新版本}"
+        printf '\n- 本次只跟随上游更新，模块本身没有改动。\n'
     else
         # 上游没发 Release、只有 tag 时，至少让用户知道运行体是哪个
         printf '\n（上游运行体 %s）\n' "$UP"

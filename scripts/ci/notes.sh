@@ -22,9 +22,14 @@ SHA="$(sha256sum "$ZIP" | cut -d' ' -f1)"
 SIZE="$(du -h "$ZIP" | cut -f1)"
 
 # ---- 本模块本次变更：CHANGELOG 最上面那一节正文 ----
+# 只有 CHANGELOG.md 这次真被改过才写这一段（CI 传 AG2A_SHOW_SELF=0 时只跟随上游）。
 # ⚠ 这里不加 head：pipefail 下 head 提前关管道会让上游拿到 SIGPIPE(141)，整步失败
-LOCAL="$(awk 'BEGIN{n=0} /^## /{n++; if(n==2) exit} n==1' CHANGELOG.md | sed '1d' | sed '/^[[:space:]]*$/d')"
-[ -n "$LOCAL" ] || LOCAL="- （CHANGELOG 里没找到对应小节）"
+if [ "${AG2A_SHOW_SELF:-1}" = "0" ]; then
+    LOCAL="- 本次只跟随上游更新，模块本身没有改动。"
+else
+    LOCAL="$(awk 'BEGIN{n=0} /^## /{n++; if(n==2) exit} n==1' CHANGELOG.md | sed '1d' | sed '/^[[:space:]]*$/d')"
+    [ -n "$LOCAL" ] || LOCAL="- （CHANGELOG 里没找到对应小节）"
+fi
 
 # ---- 上游这版改了什么 ----
 UP_BODY=""
@@ -73,7 +78,7 @@ $UP_BODY
 在管理器里刷入 zip（APatch / Magisk / KernelSU）。**首次安装要重启一次**，升级安装刷完即生效。
 升级时运行体在 \`/data/adb/ag2a/rt/\` 立即换新；两个按钮（打开/执行）的面板入口需重启一次才换成新版。
 
-刷入时可以用音量键选项；**5 秒内不按键就按默认项继续**，不会卡住。
+刷入时可以用音量键选项；**只有第一个问题有 5 秒倒计时**，不按键就按默认项继续，不会卡住。
 EOF
 
 # ---- 管理器更新日志（changelog.txt）----

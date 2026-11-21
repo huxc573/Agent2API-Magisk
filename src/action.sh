@@ -32,7 +32,14 @@ auto_status() {
     esac
     _ch=$(sed -n 's/^[[:space:]]*AG2A_UPDATE_CHANNEL=\([A-Za-z]*\).*/\1/p' "$CONF" 2>/dev/null | head -n1)
     [ -n "$_ch" ] || _ch=beta
-    echo "开启（每天 $_at，通道 $_ch）"
+    # 光有开关不算数：daemon 没在跑就不会真的去查。把 pid 也报出来，
+    # 「开了却没效果」一眼能看出是定时器没起来还是网络失败。
+    _t=$(tr -dc '0-9' < "$WORK/update.timer.pid" 2>/dev/null)
+    if [ -z "$_t" ] || ! kill -0 "$_t" 2>/dev/null; then
+        echo "开启（每天 $_at，通道 $_ch）｜定时器未运行"
+        return
+    fi
+    echo "开启（每天 $_at，通道 $_ch）｜定时器 pid $_t"
 }
 
 set_kv() {
@@ -151,12 +158,17 @@ auto)
     off)
         rm -f "$WORK/update.off"
         set_kv AG2A_UPDATE_INTERVAL 0
-        # 定时器不用停：tick 内部判 is_on，关着直接退出
+        # 关掉就把常驻的定时器收掉（service.sh 的 crontab 会先 stop 再按开关决定起不起）
+        sh "$MODDIR/service.sh" crontab >/dev/null 2>&1
         echo "自动更新已关闭（改回: sh $MODDIR/action.sh auto on）"
         exit 0 ;;
     on)
         rm -f "$WORK/update.off"
         set_kv AG2A_UPDATE_INTERVAL 86400
+        # ⚠ 关闭状态下 daemon 根本不存在（service.sh 看到关着就不拉起它），所以必须当场
+        #   把定时器拉起来。以前这里只写配置，用户「开了」却要等重启手机才生效 —— 现象
+        #   就是「自动更新没效果」。
+        sh "$MODDIR/service.sh" crontab >/dev/null 2>&1
         echo "自动更新已开启 → $(auto_status)"
         exit 0 ;;
     status)

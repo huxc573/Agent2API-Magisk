@@ -61,8 +61,9 @@ set_perm_recursive "$DATA_DIR" 0 0 0700 0600
 #   用 read 会永久阻塞（现象＝进度条卡住、提示也不显示），用 echo 也不显示。
 # 业界可行做法（OpenList-Magisk / box_for_magisk 等）是读 /dev/input 的音量键：
 #   音量下 = 切下一项，音量上 = 确认。
-# ⚠ 必须带倒计时：早年这里是无超时的死等，不按键就永远卡在进度条上，
+# ⚠ 第一个问题必须带倒计时：早年这里是无超时的死等，不按键就永远卡在进度条上，
 #   用户以为刷坏了。现在 5 秒没动就采用当前项（默认项都是「不改动」那一个）。
+#   只有第一个问题倒计时；后面的问题一律等按键（见 choose）。
 AG2A_PICK_TIMEOUT=${AG2A_PICK_TIMEOUT:-5}
 
 _key_once() {
@@ -85,11 +86,17 @@ _nth() {
 }
 
 # choose "标题" 默认序号 选项1 选项2 ...  ⇒ 结果在 $CHOICE，采用值在 $PICKED
-# 交互：音量下切项、音量上确认；${AG2A_PICK_TIMEOUT} 秒内没有任何按键＝自动确认当前项。
+# 交互：音量下切项、音量上确认。
+# 只有**第一个**问题带 ${AG2A_PICK_TIMEOUT} 秒倒计时（不按键＝采用默认项，避免刷入卡住）；
+# 后面的问题不再倒计时 —— 人已经在按键了，每个都倒计时反而会把正要选的项跳掉。
+# 无倒计时就一直等下一个按键（getevent 自己阻塞 1 秒，不额外 sleep）。
 choose() {
     _ct=$1; _cd=$2; shift 2
     _cn=$#
     _cur=$_cd
+    _to=${_pick_timeout:-$AG2A_PICK_TIMEOUT}
+    _pick_timeout=0                     # 用完即清：只有第一个菜单倒计时
+    case "$_to" in '' | *[!0-9]*) _to=0 ;; esac
     if ! command -v getevent >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1; then
         CHOICE=$_cd
         PICKED=$(_nth "$_cd" "$@")
@@ -97,26 +104,38 @@ choose() {
         return
     fi
     ui_print " "
-    ui_print "- $_ct: 音量下=切换  音量上=确认  不按=${AG2A_PICK_TIMEOUT}秒后自动确认"
+    if [ "$_to" -gt 0 ]; then
+        ui_print "- $_ct: 音量下=切换  音量上=确认  不按=${_to}秒后自动确认"
+    else
+        ui_print "- $_ct: 音量下=切换  音量上=确认"
+    fi
     ui_print "  → $(_nth "$_cur" "$@")"
-    _left=$AG2A_PICK_TIMEOUT
+    _left=$_to
     _picked_by_key=0
-    while [ "$_left" -gt 0 ]; do
+    while :; do
         case "$(_key_once)" in
             down)
                 _cur=$((_cur % _cn + 1))
-                _left=$AG2A_PICK_TIMEOUT
-                ui_print "  → $(_nth "$_cur" "$@")  (${_left}s)" ;;
+                if [ "$_to" -gt 0 ]; then
+                    ui_print "  → $(_nth "$_cur" "$@")  (${_to}s)"
+                else
+                    ui_print "  → $(_nth "$_cur" "$@")"
+                fi ;;
             up)
                 _picked_by_key=1
-                _left=0
                 break ;;
         esac
+        [ "$_to" -gt 0 ] || continue
         _left=$((_left - 1))
-        [ "$_left" -gt 0 ] && ui_print "  …${_left}s"
-        # getevent 已阻塞约 1 秒，这里不再补 sleep，免得把倒计时拉长到 2 倍
+        if [ "$_left" -gt 0 ]; then
+            ui_print "  …${_left}s"
+        else
+            break
+        fi
     done
-    [ "$_picked_by_key" = "0" ] && ui_print "  (${AG2A_PICK_TIMEOUT} 秒内没有操作，采用当前项)"
+    if [ "$_to" -gt 0 ] && [ "$_picked_by_key" = "0" ]; then
+        ui_print "  (${_to} 秒内没有操作，采用当前项)"
+    fi
     CHOICE=$_cur
     PICKED=$(_nth "$_cur" "$@")
     # 确认后停一下：音量上键松开得慢的话，残留事件会把下一个问题也秒确认掉
@@ -166,11 +185,11 @@ if [ "$RECONF" = "1" ]; then
     choose "网关端口" 1 "$_o1" "$_o2"
     PORT=$PICKED
 
-    # 自动更新：默认项＝当前状态；首次安装默认「关闭」
-    # 理由：GitHub 的两个上游仓库目前都不可达，面板里另有「软件更新」入口，
-    # 在确定最终更新手段之前不该让模块每天 04:00 空跑一次失败。
+    # 自动更新：默认项＝当前状态；首次安装默认「开启」
+    # 实测（2026-11-21，OP12）：api.github.com 直连 200 / 1.2 秒，gh-proxy 镜像也通，
+    # 资产下载本来还有镜像兜底 ⇒ 没理由再默认关着（早年关着是因为两个仓库都连不上）。
     if [ ! -f "$DATA_DIR/update.conf" ]; then
-        _adef=2                                      # 首次安装：关闭
+        _adef=1                                      # 首次安装：开启
     elif ag2a_update_on; then
         _adef=1
     else
@@ -244,8 +263,8 @@ if [ ! -f "$DATA_DIR/update.conf" ]; then
     printf '%s\n' \
         '# 自动更新：每天一次，按下面的钟点触发（updater.sh daemon 睡到点才醒，零 CPU 空转）' \
         '# 关掉：把下面改成 0（或 sh action.sh auto off）；改钟点：sh action.sh auto 03:30' \
-        '# 首次安装默认 0=关闭：两个上游仓库当前都不可达，等更新手段定下来再开' \
-        'AG2A_UPDATE_INTERVAL=0' \
+        '# 首次安装默认 86400=开启（2026-11-21 实测 GitHub API 直连与镜像均可用）' \
+        'AG2A_UPDATE_INTERVAL=86400' \
         'AG2A_UPDATE_AT=04:00' \
         '# 更新后是否重启网关：1=是' \
         'AG2A_UPDATE_RESTART=1' \
