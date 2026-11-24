@@ -195,8 +195,13 @@ vercmp_gt() {
 #   会永远停在旧正式版（现在 latest=v3.0.8，而实际最新是 v3.3.0-beta.3）。
 pick_tag() {
     _pc="$WORK/.cand"
+    # ⚠ 不能写成 `\(true\|false\)`：Android 的 sed 是 toybox 版（`sed --version` 输出
+    #   "This is not GNU sed"），不支持 BRE 的 `\|` 交替 ⇒ 正则永不匹配、列表永远空，
+    #   日志只会报「没有符合通道（beta）的版本」，看起来像网络问题（2026-11-23 实测）。
+    #   拆成两条独立表达式，GNU / toybox / busybox 都认。
     tr -d ' \n\r\t' < "$1" | sed 's/},{/}\n{/g' \
-        | sed -n 's/.*"tag_name":"\([^"]*\)".*"prerelease":\(true\|false\).*/\1 \2/p' > "$_pc" 2>/dev/null
+        | sed -n 's/.*"tag_name":"\([^"]*\)".*"prerelease":\(true\).*/\1 true/p;s/.*"tag_name":"\([^"]*\)".*"prerelease":\(false\).*/\1 false/p' > "$_pc" 2>/dev/null
+    [ -s "$_pc" ] || say "  release 列表解析为空（JSON 结构变了？）"
     _best=""
     while read -r _t _pre; do
         [ -n "$_t" ] || continue
@@ -217,7 +222,7 @@ release_info() {
     for _r in $REPOS; do
         [ -n "$_r" ] || continue
         if ! fetch "$GH/repos/$_r/releases?per_page=12" "$_tf" "$(gh_token)"; then
-            say "  仓库 $_r 取不到（不通/被封/限流）"
+            say "  仓库 $_r 取不到（404＝已改名，或网络不通/限流）"
             continue
         fi
         _tag=$(pick_tag "$_tf" "$_ch")
