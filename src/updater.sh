@@ -69,7 +69,10 @@ fi
 
 say() {
     _t=$(date '+%Y-%m-%d %H:%M:%S')
-    printf '%s %s\n' "$_t" "$*"
+    # ⚠ 必须走 stderr：release_info / pick_tag 的 stdout 会被 `$(...)` 捕获当返回值用，
+    #    日志一旦混进 stdout，_tag 就变成「日志行 + 版本号」的多行垃圾，拼出来的下载 URL
+    #    非法、curl 立刻报错 —— 现象是每个源都不到 1 秒就「连不上」，看着像断网。
+    printf '%s %s\n' "$_t" "$*" >&2
     printf '%s %s\n' "$_t" "$*" >> "$LOG" 2>/dev/null
 }
 mark() { printf '%s %s\n' "$(date '+%m-%d %H:%M')" "$*" > "$STATUS" 2>/dev/null; }
@@ -335,9 +338,10 @@ check_once() {
     [ -n "$_chan" ] || _chan="${AG2A_UPDATE_CHANNEL:-beta}"
     say "检查更新（$REPOS，通道 $_chan）"
     _info=$(release_info) || { say "所有仓库都取不到 release（被封/网络不通）"; mark "失败：取 release 失败"; return 1; }
-    _hit=$(printf '%s' "$_info" | cut -f1)
-    _tag=$(printf '%s' "$_info" | cut -f2)
-    _want=$(printf '%s' "$_info" | cut -f3)
+    # 只认最后一行、去掉所有空白：即便将来有东西误打到 stdout，也不会把 URL 拼坏
+    _hit=$(printf '%s\n' "$_info" | cut -f1 | tail -n1 | tr -d ' \r\n')
+    _tag=$(printf '%s\n' "$_info" | cut -f2 | tail -n1 | tr -d ' \r\n')
+    _want=$(printf '%s\n' "$_info" | cut -f3 | tail -n1 | tr -d ' \r\n')
     [ -n "$_tag" ] || { say "release 里没有 tag"; mark "失败：无 tag"; return 1; }
     say "命中仓库 $_hit → $_tag"
 
