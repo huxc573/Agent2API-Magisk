@@ -51,6 +51,10 @@ ST="$ST · $IP:$PORT"
     _gp=$(ag2a_pids | head -n1)
     _t0=$(date -r "/proc/$_gp" '+%m-%d %H:%M' 2>/dev/null)
     [ -n "$_t0" ] || _t0=$(date '+%m-%d %H:%M')
+    # 运行体版本：自动更新只换 rt/bin，不改 module.prop 的版本号，
+    # 不加这一段的话列表里永远看不出运行体已经升级到哪个上游版本。
+    _upv=$(tr -d ' \r\n' < "$WORK/upstream.version" 2>/dev/null)
+    [ -n "$_upv" ] && ST="$ST · ${_upv#v}"
     ST="$ST · $_t0 启动"
 }
 case "$ST" in
