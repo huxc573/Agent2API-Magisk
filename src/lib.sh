@@ -293,6 +293,21 @@ ag2a_tz_env() {
     fi
 }
 
+# 脚本侧时区（shell 里的 date 走 bionic，规则和 glibc 不一样）。
+# ⛔ 别把文件绝对路径塞给 shell 的 TZ：bionic 不认（回退 UTC，日志与模块说明差 8 小时），
+#    带冒号的 :/path 也不认，直接当 POSIX 串解析（时区名变成 _data_adb_modules_ag 这种垃圾）。
+#    Area/City 需要系统 tzdata，没有就退回 POSIX 写法（中国无夏令时，CST-8 精确）。
+# ⚠ 只给 shell 用；网关（glibc）仍走上面的 ag2a_tz_env，绝对路径在 glibc 下有效。
+ag2a_tz_shell() {
+    [ "$(date +%z 2>/dev/null)" = "+0800" ] && return 0
+    if [ -f /system/usr/share/zoneinfo/Asia/Shanghai ]; then
+        TZ=Asia/Shanghai
+    else
+        TZ=CST-8
+    fi
+    export TZ
+}
+
 # ---------- 日志 ----------
 # 超限只留尾部；调用前必须保证没有写入者（只在启动时调用）
 ag2a_rotate() {

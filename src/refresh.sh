@@ -14,6 +14,7 @@ case "$MODDIR" in
         MODDIR=$(dirname "$(readlink -f "$0")") ;;
 esac
 . "$MODDIR/lib.sh"
+ag2a_tz_shell      # 启动时刻要按本地时间显示，别被调用方的坏 TZ 传染
 
 WORK=$(ag2a_data_dir)
 IP=""

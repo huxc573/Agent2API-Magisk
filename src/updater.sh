@@ -45,7 +45,7 @@ OFF="$WORK/update.off"
 VERF="$WORK/upstream.version"
 CONF="$WORK/update.conf"
 
-export TZ="$MODDIR/zoneinfo/Asia/Shanghai"
+ag2a_tz_shell      # 壳里的 date 用 bionic，不能喂文件路径（否则日志差 8 小时）
 
 # ---- 基础工具 ----
 have() { command -v "$1" >/dev/null 2>&1; }
