@@ -82,6 +82,23 @@ sha_of() {
     esac
 }
 
+# 下载期间持 wake lock：凌晨 tick 时设备在 Doze，一 suspend 网络请求就整批失败
+# （2026-11-28 04:00 实测：三个源各不到 1 秒全挂，几小时后手动跑同样的命令立刻成功）。
+# 成对使用、显式释放：不用 trap，某些 sh 不支持 EXIT 陷阱，漏释放会一直攥着不让睡。
+WL=/sys/power/wake_lock
+WU=/sys/power/wake_unlock
+_WL_HELD=""
+hold_wake() {
+    [ -n "$_WL_HELD" ] && return 0
+    [ -w "$WL" ] || return 0
+    printf 'ag2a-update\n' > "$WL" 2>/dev/null && _WL_HELD=1
+}
+release_wake() {
+    [ -n "$_WL_HELD" ] || return 0
+    printf 'ag2a-update\n' > "$WU" 2>/dev/null
+    _WL_HELD=""
+}
+
 # 下载：curl -> busybox wget -> wget。GitHub 会 302 到 objects.githubusercontent.com，必须跟。
 # $3 非空时带 Authorization（API 吃更高限流；资产走 302 不需要）
 # $4 = 最长秒数（默认 900）；$5 非空时启用慢速放弃（<8KB/s 持续 30 秒就掐掉换源）
@@ -91,6 +108,9 @@ fetch() {
     if have curl; then
         _cs="--connect-timeout 20 --max-time $_t"
         [ -n "$_sl" ] && _cs="$_cs --speed-limit 8192 --speed-time 30"
+        # 瞬时抖动（DNS 失败、连接被重置、5xx）自动重试：凌晨那次就是三个源各不到 1 秒全挂，
+        # 不重试的话一次抖动要等到第二天。--retry-all-errors 需要 curl ≥ 7.71（Android 8.8 支持）。
+        _cs="$_cs --retry 3 --retry-delay 5 --retry-all-errors"
         if [ -n "$_h" ]; then
             curl -fsSL $_cs -H "Authorization: Bearer $_h" -o "$_o" "$_u" && return 0
         else
@@ -257,6 +277,8 @@ sources() {
 
 fetch_asset() {
     _url=$1; _out=$2; _want=$3
+    _fa_rc=1
+    hold_wake               # 整个「多源试下载」期间不许睡
     for _p in $(sources); do
         if [ -n "$_p" ]; then
             _u="${_p%/}/$_url"
@@ -274,12 +296,12 @@ fetch_asset() {
         if [ -n "$_ok" ]; then
             if [ -z "$_want" ]; then
                 say "  没有官方摘要可比，接受该源（无法校验）"
-                return 0
+                _fa_rc=0; break
             fi
             _got=$(sha_of "$_out")
             if [ "$_got" = "$_want" ]; then
                 say "  sha256 校验通过"
-                return 0
+                _fa_rc=0; break
             fi
             say "  校验不符（得 $_got），换下一个源"
             rm -f "$_out"
@@ -287,7 +309,8 @@ fetch_asset() {
             say "  连不上/超时，换下一个源"
         fi
     done
-    return 1
+    release_wake
+    return "$_fa_rc"
 }
 
 # ELF 必须是 aarch64（防上游误传 amd64 把模块跑废）
